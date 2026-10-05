@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_12_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>12.1 Важность признаков</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">«Какие признаки важны?» — первый вопрос после обучения модели. Но «важность» можно понимать по-разному: как часто признак используется, насколько он уменьшил потери при обучении, насколько ухудшится прогноз без него. Эти ответы могут расходиться в разы.</p>
+</section>
+
+<section id="kinds">
+  <h2>Пять видов важности</h2>
+  <div class="bones" data-title="Виды важности по косточкам">
+    <details class="bone" open><summary>Число разбиений (split, weight)</summary><div class="bone-body"><p>Сколько раз признак использован в узлах. Дёшево, но обманчиво (урок <a data-lesson="lesson_9_1"></a>).</p></div></details>
+    <details class="bone"><summary>Выигрыш (gain)</summary><div class="bone-body"><p>Суммарное уменьшение потерь от разбиений по признаку на обучающих данных. Встроено во все библиотеки, по умолчанию в <code>feature_importances_</code> у XGBoost и <code>gbcourse</code>. У LightGBM по умолчанию — число разбиений (<code>importance_type="split"</code>).</p></div></details>
+    <details class="bone"><summary>Перестановочная (permutation)</summary><div class="bone-body"><p>Перемешать столбец признака на <b>отложенных</b> данных и посмотреть, насколько выросла ошибка. Модель не переобучается. Отвечает на вопрос: «насколько модель на него опирается».</p></div></details>
+    <details class="bone"><summary>Удаление признака (drop-column)</summary><div class="bone-body"><p>Переобучить модель без признака и сравнить ошибку. Отвечает на другой вопрос: «насколько он нужен, если модель может перестроиться». Дорого: одно обучение на признак.</p></div></details>
+    <details class="bone"><summary>Средний |SHAP|</summary><div class="bone-body"><p>Средний модуль вклада признака в прогноз (урок <a data-lesson="lesson_12_2"></a>). В единицах прогноза; согласован с объяснениями отдельных объектов.</p></div></details>
+  </div>
+</section>
+
+<section id="experiment">
+  <h2>Опыт: три ловушки</h2>
+  <p>Задача Фридмана с 5 признаками ($x_3$ входит слагаемым $10 x_3$), и к ней добавлены: почти точная копия $x_3$ (шум σ = 0.02), непрерывный шум и бинарный шум.</p>
+  <div data-widget="importance-lab"></div>
+  <p>Числа из ноутбука урока (2000 объектов, 300 деревьев глубины 4, перестановки — на отложенных 30%):</p>
+  <table>
+    <thead><tr><th>Признак</th><th>разбиений</th><th>gain (доля)</th><th>перестановка, тест</th><th>перестановка, обучение</th><th>удаление</th><th>средний |SHAP|</th></tr></thead>
+    <tbody>
+      <tr><td>$x_3$</td><td class="num">409</td><td class="num">0.081</td><td class="num">2.12</td><td class="num">2.34</td><td class="num">−0.02</td><td class="num">0.77</td></tr>
+      <tr><td>копия $x_3$</td><td class="num">296</td><td class="num">0.278</td><td class="num">7.05</td><td class="num">7.29</td><td class="num">−0.06</td><td class="num">1.65</td></tr>
+      <tr><td>непрерывный шум</td><td class="num">380</td><td class="num">0.005</td><td class="num">0.015</td><td class="num">0.139</td><td class="num">−0.03</td><td class="num">0.07</td></tr>
+      <tr><td>бинарный шум</td><td class="num">31</td><td class="num">0.000</td><td class="num">0.002</td><td class="num">0.019</td><td class="num">+0.02</td><td class="num">0.03</td></tr>
+      <tr><td>$x_0$ (для сравнения)</td><td class="num">959</td><td class="num">0.237</td><td class="num">11.04</td><td class="num">11.43</td><td class="num">+6.97</td><td class="num">1.90</td></tr>
+    </tbody>
+  </table>
+  <div class="bones" data-title="Что показал опыт">
+    <details class="bone" open><summary>Коррелированные признаки делят важность</summary><div class="bone-body"><p>Вклад $x_3$ распределился между оригиналом и копией, и в каком соотношении — дело случая: здесь «копии» досталось больше. Удаление любого из них почти ничего не стоит (−0.02 и −0.06): второй заменяет первого. А удаление обоих вместе увеличивает MSE на 9.35 — больше, чем удаление любого другого признака: по формуле задачи $x_3$ — один из главных. Перед выводами проверяйте корреляции и удаляйте или группируйте признаки группой.</p></div></details>
+    <details class="bone"><summary>Непрерывный шум набирает разбиения</summary><div class="bone-body"><p>У непрерывного шума много возможных порогов, и мелкие разбиения по нему находятся всегда: 380 разбиений — почти как у $x_3$. Пользы от них нет: gain 0.005, перестановка 0.015. Бинарный шум — всего 31 разбиение.</p></div></details>
+    <details class="bone"><summary>Перестановка на обучении завышает шум</summary><div class="bone-body"><p>Модель немного подогналась под шум обучающих данных, поэтому на них перемешивание шума вредит (0.139), а на отложенных — почти нет (0.015). Считайте перестановочную важность на данных, которых модель не видела.</p></div></details>
+  </div>
+</section>
+
+<section id="choose">
+  <h2>Какую важность выбрать</h2>
+  <table>
+    <thead><tr><th>Вопрос</th><th>Важность</th></tr></thead>
+    <tbody>
+      <tr><td>На что опирается эта модель?</td><td>перестановочная на тесте, средний |SHAP|</td></tr>
+      <tr><td>Можно ли обойтись без признака (сбор данных стоит денег)?</td><td>удаление (drop-column), лучше группами коррелированных признаков</td></tr>
+      <tr><td>Быстро взглянуть</td><td>gain; никогда — число разбиений</td></tr>
+      <tr><td>Объяснить конкретные прогнозы и согласовать с ними общую картину</td><td>средний |SHAP|</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Перестановочная важность на тесте и на обучении">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, GBRegressor
+from gbcourse.explain import permutation_importance
+
+X, y = datasets.friedman1(n=2000, noise=1.0, seed=181, n_features=5)
+rng = np.random.default_rng(0)
+X = np.c_[X, rng.uniform(0, 1, len(y))]            # + непрерывный шум (признак 5)
+X_tr, X_te, y_tr, y_te = datasets.train_test_split(X, y, test_size=0.3, seed=0)
+model = GBRegressor(n_estimators=200, learning_rate=0.1, max_depth=4).fit(X_tr, y_tr)
+mse = lambda a, b: float(np.mean((a - b) ** 2))
+for name, (A, B) in {"тест": (X_te, y_te), "обучение": (X_tr, y_tr)}.items():
+    imp, _ = permutation_importance(model.predict, A, B, mse, n_repeats=5, seed=0)
+    print(f"{name:8s}", np.round(imp, 3))</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Разные виды важности отвечают на разные вопросы — выбирайте по вопросу.</li>
+    <li>Коррелированные признаки делят важность, а удаление одного из них почти бесплатно.</li>
+    <li>Число разбиений переоценивает непрерывный шум; перестановочную важность считайте на отложенных данных.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Признаки «рост в см» и «рост в дюймах» оба в модели. Удаление каждого по отдельности почти не меняет ошибку. Значит ли это, что рост не важен?", "options": ["да", "нет — они заменяют друг друга; удалите оба и проверьте", "да, если gain маленький"], "answer": 1, "explain": "Коррелированные признаки нужно проверять группой."},
+    {"q": "Почему перестановочную важность лучше считать на отложенных данных?", "options": ["так быстрее", "на обучении модель подогнана и под шум — важность шума завышается", "на обучении перемешивание невозможно"], "answer": 1, "explain": "В опыте: 0.139 на обучении против 0.015 на тесте."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

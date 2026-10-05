@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_6">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>6. Градиентный бустинг для классификации</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем этот модуль</h2>
+  <p class="lead">Большинство задач бустинга в индустрии — классификация: дефолт по кредиту, клик, отток, мошенничество. Алгоритм тот же, что в модуле <a data-lesson="lesson_5">5</a>, — меняется функция потерь. Но есть тонкость: складывать надо не вероятности.</p>
+</section>
+
+<section id="problem">
+  <h2>Почему нельзя складывать вероятности</h2>
+  <p>Вероятность живёт на отрезке [0, 1]. Сумма деревьев — любое число. Если складывать вероятности, модель легко выдаст 1.3 или −0.2. Решение — складывать <strong>логарифм шансов</strong> (log-odds, логит), который пробегает всю числовую ось, и превращать его в вероятность сигмоидой:</p>
+  <div class="formula">$$F(x) = \log\frac{p(x)}{1 - p(x)} \in (-\infty, +\infty), \qquad p(x) = \sigma(F(x)) = \frac{1}{1 + e^{-F(x)}}$$</div>
+  <p>Потери — логистические (log-loss, бинарная кросс-энтропия). Их антиградиент по $F$ удивительно прост:</p>
+  <div class="formula">$$L = -\big[y\log p + (1-y)\log(1-p)\big], \qquad r = -\frac{\partial L}{\partial F} = y - p$$</div>
+  <p>Псевдо-остаток — «ответ минус вероятность»: +0.8, если объект класса 1 получил вероятность 0.2; −0.1, если объект класса 0 получил 0.1. Дерево учится на этих числах.</p>
+</section>
+
+<section id="sandbox">
+  <h2>Песочница</h2>
+  <p>Фон — вероятность класса 1 после $m$ деревьев, линия — граница $p = 0.5$. Включите «Показать псевдо-остатки»: точки окрасятся по $y - p$ (синий — отрицательный, красный — положительный). Именно эти числа будет приближать следующее дерево.</p>
+  <div data-widget="boosting-2d" data-config='{"dataset": {"kind": "moons", "n": 300, "noise": 0.25, "seed": 61}, "model": {"learningRate": 0.3, "maxDepth": 2, "nEstimators": 150}, "controls": ["dataset", "noise", "lr", "depth", "M", "resid"], "start": 5}'></div>
+</section>
+
+<section id="plan">
+  <h2>Модуль по косточкам</h2>
+  <div class="bones" data-title="Классификация по косточкам">
+    <details class="bone" open><summary data-go="lesson_6_1">Логиты, сигмоида и log-loss</summary><div class="bone-body"><p>Что такое шансы и их логарифм, почему log-loss — правильная мера, $F_0 = \log\frac{\bar y}{1-\bar y}$, градиент и гессиан.</p></div></details>
+    <details class="bone"><summary data-go="lesson_6_2">Шаг Ньютона в листьях</summary><div class="bone-body"><p>Значение листа $\sum r_i / \sum p_i(1-p_i)$ — вывод и ручной расчёт.</p></div></details>
+    <details class="bone"><summary data-go="lesson_6_3">Многоклассовая классификация</summary><div class="bone-body"><p>Softmax, K деревьев на итерацию, градиенты $y_k - p_k$.</p></div></details>
+  </div>
+  <div data-sublessons></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Классификатор и его вероятности">
+<pre><code class="language-python">import numpy as np
+from sklearn.ensemble import GradientBoostingClassifier
+from gbcourse import datasets, GBClassifier
+
+X, y = datasets.classification_2d(kind="moons", n=300, noise=0.25, seed=61)
+ours = GBClassifier(n_estimators=150, learning_rate=0.3, max_depth=2).fit(X, y)
+sk = GradientBoostingClassifier(n_estimators=150, learning_rate=0.3, max_depth=2).fit(X, y)
+print("F0 = log-odds доли класса 1:", ours.init_, "=", np.log(y.mean() / (1 - y.mean())))
+print("вероятности первых объектов:", ours.predict_proba(X[:3])[:, 1].round(3))
+print("расхождение с sklearn:", np.abs(ours.predict_proba(X) - sk.predict_proba(X)).max())</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Бустинг складывает логарифмы шансов; вероятность = сигмоида суммы.</li>
+    <li>Потери — log-loss; псевдо-остатки $y - p$.</li>
+    <li>Всё остальное — как в регрессии, кроме значений листьев (шаг Ньютона).</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Объект класса 0, модель дала p = 0.7. Псевдо-остаток?", "options": ["0.7", "−0.7", "0.3"], "answer": 1, "explain": "y − p = 0 − 0.7."},
+    {"q": "Что возвращает сумма деревьев бустинга-классификатора?", "options": ["Вероятность класса 1", "Логарифм шансов класса 1", "Номер класса"], "answer": 1, "explain": "Вероятность — после сигмоиды."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

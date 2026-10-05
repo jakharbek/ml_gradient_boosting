@@ -1,0 +1,39 @@
+# Курс «Градиентный бустинг по косточкам» — зависимости Python.
+# Рекомендуемая версия Python: 3.11–3.12 (для 3.13+ проверьте наличие колёс catboost/shap).
+#
+# Установка (из корня репозитория):
+#   python -m venv .venv
+#   .venv\Scripts\activate          (Windows)   |   source .venv/bin/activate   (Linux/macOS)
+#   pip install -r requirements.txt
+#
+# Точные версии, на которых курс проверен, — в requirements-lock.txt.
+
+# --- Научный стек ---
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+scikit-learn>=1.6          # FrozenEstimator, TargetEncoder (примеры 15, 28)
+matplotlib>=3.10
+
+# --- Библиотеки градиентного бустинга ---
+xgboost>=2.0
+lightgbm>=4.7              # eval_X / eval_y вместо устаревшего eval_set
+catboost>=1.2.5
+
+# --- Интерпретация и подбор гиперпараметров ---
+shap>=0.45
+optuna>=3.6
+
+# --- Jupyter ---
+jupyterlab>=4.1
+ipykernel>=6.29
+ipywidgets>=8.1
+
+# --- Сборка ноутбуков и тесты ---
+nbformat>=5.10
+nbclient>=0.10
+pytest>=8.0
+ruff>=0.5
+
+# --- Учебная библиотека курса (shared/python/gbcourse) в режиме разработки ---
+-e .

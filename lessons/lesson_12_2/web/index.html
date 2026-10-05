@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_12_2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>12.2 Значения Шепли и SHAP</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">В уроке <a data-lesson="lesson_12"></a> мы разложили прогноз в сумму вкладов признаков. Но разложить можно по-разному. Если признаки взаимодействуют ($\sin(\pi x_0 x_1)$), кому засчитать общий эффект — $x_0$ или $x_1$? Шепли (1953, Нобелевская премия 2012) доказал: есть ровно один способ, удовлетворяющий четырём разумным требованиям.</p>
+</section>
+
+<section id="game">
+  <h2>Признаки как игроки</h2>
+  <p>Объект $x$ зафиксирован. <b>Коалиция</b> $S$ — множество признаков, значения которых мы «знаем». Её <b>ценность</b> — ожидаемый прогноз, когда известны только признаки из $S$:</p>
+  <div class="formula">$$v(S) = \mathbb{E}\big[F(X) \mid X_S = x_S\big], \qquad v(\varnothing) = \varphi_0 = \mathbb{E}[F(X)], \qquad v(\{1..d\}) = F(x).$$</div>
+  <p>Вклад признака $j$ — его <b>средний предельный вклад</b> $v(S \cup \{j\}) - v(S)$ по всем порядкам, в которых признаки могли бы «присоединяться» к коалиции:</p>
+  <div class="formula">$$\varphi_j = \sum_{S \subseteq \{1..d\} \setminus \{j\}} \frac{|S|!\,(d - |S| - 1)!}{d!}\,\big[v(S \cup \{j\}) - v(S)\big].$$</div>
+  <div data-widget="coalitions"></div>
+</section>
+
+<section id="axioms">
+  <h2>Аксиомы: почему именно так</h2>
+  <div class="bones" data-title="Аксиомы Шепли по косточкам">
+    <details class="bone" open><summary>Эффективность (local accuracy)</summary><div class="bone-body"><p>$\varphi_0 + \sum_j \varphi_j = F(x)$: вклады полностью объясняют прогноз, без остатка.</p></div></details>
+    <details class="bone"><summary>Симметрия</summary><div class="bone-body"><p>Если признаки $i$ и $j$ дают одинаковый вклад в любую коалицию, их значения Шепли равны. Взаимодействие $x_0 x_1$ делится поровну, если признаки входят в него одинаково.</p></div></details>
+    <details class="bone"><summary>Нулевой игрок (dummy)</summary><div class="bone-body"><p>Признак, который ни в одной коалиции ничего не меняет, получает ноль. Модель не использует $x_6$ — $\varphi_6 = 0$.</p></div></details>
+    <details class="bone"><summary>Аддитивность</summary><div class="bone-body"><p>Для суммы моделей вклады складываются. Бустинг — сумма деревьев, поэтому значения Шепли модели — сумма значений Шепли деревьев. Именно это позволяет считать их по деревьям по отдельности.</p></div></details>
+  </div>
+  <p>Теорема Шепли: эти четыре требования выполняет <b>единственное</b> распределение — формула выше.</p>
+</section>
+
+<section id="treeshap">
+  <h2>TreeSHAP: быстро и точно для деревьев</h2>
+  <div class="bones" data-title="TreeSHAP по косточкам">
+    <details class="bone" open><summary>Ценность коалиции для дерева</summary><div class="bone-body"><p>Как посчитать $\mathbb{E}[f(X) \mid X_S = x_S]$ для дерева? Спускаемся от корня. В узле с признаком из $S$ идём туда, куда отправляет $x$. В узле с неизвестным признаком идём в обе ветви и усредняем их с весами — долями обучающих объектов в ветвях (<code>cover</code>). Так работает <code>expected_value</code> в <code>gbcourse</code>.</p></div></details>
+    <details class="bone"><summary>Полный перебор и TreeSHAP</summary><div class="bone-body"><p>По определению нужно $2^d$ коалиций: наш перебор в <code>gbcourse</code> годится для $d \lesssim 12$. TreeSHAP (Лундберг и др., 2018) получает те же числа за $O(T L D^2)$ — полиномиально по глубине, без перебора. Тест проекта сверяет наш перебор с <code>shap.TreeExplainer</code> до $10^{-15}$.</p></div></details>
+    <details class="bone"><summary>Два способа «не знать» признак</summary><div class="bone-body"><p>«Путевой» (<code>tree_path_dependent</code>, по умолчанию) усредняет по долям обучающих объектов в узлах — это условное ожидание по дереву. «Интервенционный» (<code>interventional</code>) подставляет значения признака из фоновой выборки, как будто признак изменили независимо от остальных. При коррелированных признаках результаты могут различаться. В ноутбуке урока с почти точной копией $x_0$ различия оказались невелики (средний |φ| копии 0.69 и 0.74). Важнее другое: в обоих способах вклад $x_0$ поделён между двумя столбцами — как и важность в уроке <a data-lesson="lesson_12_1"></a>.</p></div></details>
+  </div>
+</section>
+
+<section id="plots">
+  <h2>Сводный график и график зависимости</h2>
+  <p>Посчитав вклады для многих объектов, получаем два главных графика. <b>Сводный</b> (beeswarm): для каждого признака — облако вкладов по объектам, цвет — значение признака. <b>Зависимость</b>: вклад признака против его значения, цвет — значение другого признака; разброс по вертикали при одном значении выдаёт взаимодействие.</p>
+  <div data-widget="shap-plots"></div>
+  <p>График зависимости $x_0$ с раскраской по $x_1$: в целом вклад $x_0$ растёт с $x_0$ примерно от −4 до +2 и выходит на плато — это форма $\sin(\pi x_0 x_1)$. Разброс по вертикали при одном значении $x_0$ выдаёт взаимодействие. При малых $x_0$ объекты с большим $x_1$ (красные) получают заметно более отрицательный вклад (около −4.5…−5.8), чем с малым $x_1$ (синие, около −3…−3.5): при большом $x_1$ произведение $x_0 x_1$, а с ним и синус, сильнее зависит от $x_0$.</p>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Значения Шепли по определению: все коалиции">
+<pre><code class="language-python">import itertools, math
+import numpy as np
+from gbcourse import datasets, GBRegressor
+from gbcourse.explain import expected_value, shapley_values
+
+X, y = datasets.friedman1(n=600, noise=1.0, seed=180, n_features=7)
+Xs = X[:, [0, 1, 3]]                         # три признака: x0, x1, x3
+model = GBRegressor(n_estimators=50, max_depth=2, learning_rate=0.2).fit(Xs, y)
+x = Xs[0]
+v = lambda S: float(np.ravel(model.init_)[0]) + sum(model.learning_rate * expected_value(st[0], x, set(S)) for st in model.trees_)
+d, phi = 3, np.zeros(3)
+for j in range(d):
+    others = [k for k in range(d) if k != j]
+    for r in range(d):
+        for S in itertools.combinations(others, r):
+            w = math.factorial(len(S)) * math.factorial(d - len(S) - 1) / math.factorial(d)
+            phi[j] += w * (v(S + (j,)) - v(S))
+print("по определению:", np.round(phi, 6))
+print("shapley_values:", np.round(shapley_values(model, x)[1], 6))</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Значение Шепли — средний предельный вклад признака по всем порядкам присоединения к коалиции.</li>
+    <li>Это единственное распределение с эффективностью, симметрией, нулевым игроком и аддитивностью.</li>
+    <li>Для деревьев TreeSHAP считает точные значения быстро; результат зависит от того, как «не знать» признак.</li>
+    <li>Сводный график показывает важность и направление влияния, график зависимости — форму и взаимодействия.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Модель F(x) = 2·x₁ (признак x₂ не используется), признаки независимы, E[x₁] = 0.5, объект x₁ = 1. Чему равны φ₁ и φ₂?", "options": ["φ₁ = 1, φ₂ = 0", "φ₁ = 2, φ₂ = 0", "φ₁ = 0.5, φ₂ = 0.5"], "answer": 0, "explain": "φ₀ = 1, F(x) = 2, вся разница 1 — от x₁; x₂ — нулевой игрок."},
+    {"q": "С каким весом входит в φⱼ пустая коалиция S = ∅ при d = 3?", "options": ["1/3", "1/6", "1/8"], "answer": 0, "explain": "0!·2!/3! = 2/6 = 1/3: признак j первым присоединяется в 2 порядках из 6."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

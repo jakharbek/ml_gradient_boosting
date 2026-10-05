@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_3_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3.1 Бэггинг и случайный лес</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Случайный лес — главный конкурент бустинга и прекрасная точка сравнения. Понимая, почему лес работает, вы лучше поймёте, чем бустинг от него отличается.</p>
+  <p>К тому же две идеи леса перекочевали в бустинг почти без изменений: случайные подвыборки объектов (<code>subsample</code>) и признаков (<code>colsample_*</code>) — урок <a data-lesson="lesson_7_2"></a>.</p>
+</section>
+
+<section id="bootstrap">
+  <h2>Бутстрэп: много выборок из одной</h2>
+  <p>У нас одна обучающая выборка, а для усреднения нужны разные модели. Идея Эфрона (1979): создать «новые» выборки, вынимая $n$ объектов <strong>с возвращением</strong>. Одни объекты попадут дважды-трижды, другие — ни разу.</p>
+  <div class="formula">$$P(\text{объект не попал}) = \Big(1 - \frac1n\Big)^{n} \xrightarrow{n\to\infty} e^{-1} \approx 0.368$$</div>
+  <p>В каждую бутстрэп-выборку попадает около 63.2% различных объектов. Оставшиеся 36.8% — <strong>вне мешка</strong> (out-of-bag, OOB): на них дерево не училось, и они годятся для честной проверки.</p>
+  <div data-widget="bagging-demo"></div>
+</section>
+
+<section id="bagging">
+  <h2>Бэггинг = Bootstrap AGGregatING</h2>
+  <div class="formula">$$\hat F_{\text{bag}}(x) = \frac1B \sum_{b=1}^{B} \hat h_b(x), \qquad \hat h_b \text{ обучено на бутстрэп-выборке } b$$</div>
+  <p>Базовые модели — глубокие деревья: у них малое смещение, а большой разброс гасит усреднение. Для классификации усредняют вероятности или голосуют.</p>
+  <div class="callout tip"><p><strong>OOB-оценка бесплатна.</strong> Для каждого объекта усредним только деревья, которые его не видели, и посчитаем ошибку. Это почти то же, что кросс-валидация, но без повторного обучения.</p></div>
+</section>
+
+<section id="rf">
+  <h2>Случайный лес: декорреляция</h2>
+  <p>Бутстрэп-деревья похожи друг на друга: сильный признак раз за разом оказывается в корне. Из урока <a data-lesson="lesson_3"></a> мы знаем, что разброс среднего упирается в $\rho\sigma^2$ — корреляция мешает. Брейман (2001) предложил в <em>каждом узле</em> выбирать разбиение лишь среди $m$ случайных признаков из $d$:</p>
+  <ul>
+    <li>регрессия: обычно $m \approx d/3$; классификация: $m \approx \sqrt d$;</li>
+    <li>меньше $m$ → деревья разнообразнее (ρ ↓), но каждое хуже (σ² и смещение ↑).</li>
+  </ul>
+  <div data-widget="rf-decorrelation"></div>
+</section>
+
+<section id="bones">
+  <h2>Разбор по косточкам</h2>
+  <div class="bones" data-title="Случайный лес по косточкам">
+    <details class="bone"><summary>Источник разнообразия №1: бутстрэп объектов</summary><div class="bone-body"><p>Каждое дерево видит свою выборку. В бустинге аналог — <code>subsample</code>, но без возвращения.</p></div></details>
+    <details class="bone"><summary>Источник разнообразия №2: случайные признаки в узлах</summary><div class="bone-body"><p><code>max_features</code> в лесе ↔ <code>colsample_bynode</code> в XGBoost.</p></div></details>
+    <details class="bone"><summary>Объединение: усреднение</summary><div class="bone-body"><p>Порядок деревьев не важен, их можно строить параллельно.</p></div></details>
+    <details class="bone"><summary>Чего лес не умеет</summary><div class="bone-body">
+      <details class="bone"><summary>Не уменьшает смещение</summary><div class="bone-body"><p>Если дерево систематически ошибается (например, не видит тонкого эффекта), среднее ошибается так же.</p></div></details>
+      <details class="bone"><summary>Не экстраполирует</summary><div class="bone-body"><p>Как и любые деревья (урок <a data-lesson="lesson_2_4"></a>).</p></div></details>
+    </div></details>
+  </div>
+  <div class="compare">
+    <div><h4>Когда выбрать лес</h4><p>Нужна надёжная модель почти без настройки; много шума; важно не переобучиться по числу деревьев; параллельное обучение.</p></div>
+    <div><h4>Когда выбрать бустинг</h4><p>Нужна максимальная точность и есть время на настройку темпа, глубины, ранней остановки; структурированные табличные данные.</p></div>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Бэггинг вручную и OOB-оценка">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, BaggingTrees
+from gbcourse.metrics import mse
+
+X, y = datasets.friedman1(n=300, noise=1.0, seed=31)
+X_te, y_te = datasets.friedman1(n=2000, noise=1.0, seed=32)
+for mf in (1.0, 0.5, 0.3, 0.1):
+    rf = BaggingTrees(n_estimators=100, max_depth=None, max_features=mf, seed=0).fit(X, y)
+    oob = rf.oob_predict(X)
+    print(f"max_features = {mf}: OOB MSE {mse(y[~np.isnan(oob)], oob[~np.isnan(oob)]):.3f}, тест MSE {mse(y_te, rf.predict(X_te)):.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Бутстрэп создаёт разные выборки; каждая содержит ≈ 63% различных объектов.</li>
+    <li>Бэггинг усредняет глубокие деревья и уменьшает разброс; число деревьев не переобучает.</li>
+    <li>Случайный лес добавляет случайные признаки в узлах и снижает корреляцию деревьев.</li>
+    <li>OOB-оценка — бесплатная валидация. Идеи подвыборок перешли в бустинг.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Какая доля объектов в среднем не попадает в бутстрэп-выборку большого размера?", "options": ["≈ 10%", "≈ 36.8%", "≈ 50%"], "answer": 1, "explain": "(1 − 1/n)ⁿ → 1/e ≈ 0.368."},
+    {"q": "Зачем случайному лесу случайные признаки в узлах?", "options": ["Чтобы деревья строились быстрее", "Чтобы уменьшить корреляцию деревьев и усилить эффект усреднения", "Чтобы уменьшить смещение каждого дерева"], "answer": 1, "explain": "Смещение каждого дерева от этого, наоборот, растёт; выигрыш — в декорреляции."},
+    {"q": "Что оценивает OOB-ошибка?", "options": ["Ошибку на обучении", "Ошибку на данных, которые конкретные деревья не видели — аналог валидации", "Смещение леса"], "answer": 1, "explain": "Для каждого объекта используются только деревья, для которых он был вне мешка."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

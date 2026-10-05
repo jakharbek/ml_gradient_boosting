@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_3_3">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3.3 Аддитивные модели и пошаговое построение</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">AdaBoost придумали как алгоритм с весами. Через пять лет Фридман, Хасти и Тибширани (2000) увидели в нём другое: жадную минимизацию функции потерь, по одному слагаемому за шаг.</p>
+  <p>Этот взгляд открыл дверь: раз бустинг минимизирует потери, их можно заменить на любые другие. Надо лишь понять, как делать шаг для произвольной функции потерь. Ответ — градиентный бустинг, и этот урок подводит к нему вплотную.</p>
+</section>
+
+<section id="additive">
+  <h2>Аддитивная модель</h2>
+  <p>Модель, собранная из простых кирпичиков с коэффициентами, называется <strong>аддитивной</strong>:</p>
+  <div class="formula">$$F_M(x) = \sum_{m=1}^{M} \beta_m\, b(x;\ \gamma_m)$$</div>
+  <dl class="formula-legend">
+    <dt>$b(x;\gamma)$</dt><dd>базовая функция с параметрами $\gamma$ — например, дерево (пороги и значения листьев)</dd>
+    <dt>$\beta_m$</dt><dd>коэффициент при $m$-й функции</dd>
+  </dl>
+  <p>Подбирать все $\beta_m, \gamma_m$ одновременно слишком сложно. Поэтому поступают жадно.</p>
+</section>
+
+<section id="fsam">
+  <h2>Прямое пошаговое построение (FSAM)</h2>
+  <div class="formula">$$(\beta_m, \gamma_m) = \arg\min_{\beta, \gamma} \sum_{i=1}^{n} L\big(y_i,\; F_{m-1}(x_i) + \beta\, b(x_i; \gamma)\big), \qquad F_m = F_{m-1} + \beta_m b(\cdot; \gamma_m)$$</div>
+  <p>Уже добавленные слагаемые не трогаем, на каждом шаге подбираем лучшее новое. Это Forward Stagewise Additive Modeling. Посмотрим, во что оно превращается при разных потерях.</p>
+  <div class="steps">
+    <section class="step">
+      <h4>Квадратичные потери → обучение на остатках</h4>
+      <div class="formula">$$L\big(y_i, F_{m-1}(x_i) + \beta b(x_i)\big) = \big(\underbrace{y_i - F_{m-1}(x_i)}_{r_{im}} - \beta b(x_i)\big)^2$$</div>
+      <p>Шаг FSAM — просто подогнать новое слагаемое к <strong>остаткам</strong> $r_{im}$ методом наименьших квадратов. Это ровно «бустинг на остатках» из модуля <a data-lesson="lesson_4">4</a>.</p>
+    </section>
+    <section class="step">
+      <h4>Экспоненциальные потери → AdaBoost (1)</h4>
+      <p>Классы $y \in \{-1, +1\}$, потери $L(y, F) = e^{-yF}$. Вынесем то, что не зависит от нового слагаемого:</p>
+      <div class="formula">$$\sum_i e^{-y_i (F_{m-1}(x_i) + \beta b(x_i))} = \sum_i \underbrace{e^{-y_i F_{m-1}(x_i)}}_{w_i^{(m)}}\, e^{-\beta y_i b(x_i)}$$</div>
+      <p>Вот и веса объектов AdaBoost! Вес — это экспоненциальная потеря объекта на текущем ансамбле.</p>
+    </section>
+    <section class="step">
+      <h4>Экспоненциальные потери → AdaBoost (2)</h4>
+      <p>Для $b(x) \in \{-1, +1\}$: $e^{-\beta y b} = e^{-\beta}$ при верном ответе и $e^{\beta}$ при ошибке. Значит:</p>
+      <div class="formula">$$\sum_i w_i e^{-\beta y_i b(x_i)} = e^{-\beta}\sum_i w_i + (e^{\beta} - e^{-\beta}) \sum_i w_i [b(x_i) \ne y_i]$$</div>
+      <p>При любом $\beta &gt; 0$ лучшая $b$ минимизирует <strong>взвешенную ошибку</strong> — это шаг 1 AdaBoost.</p>
+    </section>
+    <section class="step">
+      <h4>Экспоненциальные потери → AdaBoost (3)</h4>
+      <p>Производная по $\beta$ равна нулю при</p>
+      <div class="formula">$$\beta_m = \frac12 \ln\frac{1 - \varepsilon_m}{\varepsilon_m}$$</div>
+      <p>— в точности $\alpha_m$ AdaBoost. А новые веса $w^{(m+1)}_i = w^{(m)}_i e^{-\beta_m y_i b_m(x_i)}$ — шаг 3. <strong>AdaBoost = FSAM с экспоненциальными потерями.</strong></p>
+    </section>
+    <section class="step">
+      <h4>А если потери другие?</h4>
+      <p>Для L2 и экспоненциальных потерь шаг FSAM решается явно. Для абсолютных, Хьюбера, логистических, своих бизнес-потерь — нет: задача $\arg\min_{\beta,\gamma}$ по деревьям в общем случае неразрешима. Нужен универсальный способ сделать хороший шаг. Фридман (2001) предложил: <em>шагать по антиградиенту</em>. Об этом — модуль <a data-lesson="lesson_5">5</a>.</p>
+    </section>
+  </div>
+</section>
+
+<section id="margin">
+  <h2>Потери через отступ</h2>
+  <p>В бинарной классификации удобно смотреть на <strong>отступ</strong> (margin) $yF(x)$: положительный — верный ответ, и чем он больше, тем увереннее; отрицательный — ошибка.</p>
+  <div data-widget="margin-losses"></div>
+  <div class="compare">
+    <div><h4>Экспоненциальные $e^{-yF}$</h4><p>При уверенной ошибке растут экспоненциально — отсюда взрыв весов испорченных меток в AdaBoost.</p></div>
+    <div><h4>Логистические $\log(1 + e^{-2yF})$</h4><p>При ошибке растут лишь линейно: один испорченный объект не может перетянуть на себя всю модель. Это log-loss, основа классификации в градиентном бустинге (урок <a data-lesson="lesson_6_1"></a>).</p></div>
+  </div>
+  <div class="callout practice"><p>Не принимайте теорию на веру. В коде ниже градиентный бустинг с маленьким темпом и неглубокими деревьями обучается с обеими потерями при разной доле испорченных меток. На этих данных разница оказывается небольшой: маленький шаг и ограниченное число деревьев сами сдерживают разгон. Взрыв весов опасен прежде всего в классическом AdaBoost с полным шагом. Главные доводы за log-loss — корректные вероятности и связь с правдоподобием.</p></div>
+  <div class="callout note"><p>Минимум ожидаемых экспоненциальных и логистических потерь достигается в одной и той же точке $F^*(x) = \tfrac12 \ln\frac{P(y=1|x)}{P(y=-1|x)}$ — половине логарифма шансов. Поэтому обе дают согласованные вероятности; различаются они поведением на ошибках.</p></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Экспоненциальные и логистические потери при шуме в метках">
+<pre><code class="language-python">import numpy as np
+from sklearn.ensemble import GradientBoostingClassifier
+from gbcourse import datasets, Mulberry32
+
+X, y = datasets.classification_2d(kind="moons", n=600, noise=0.25, seed=33)
+X_tr, X_te, y_tr, y_te = datasets.train_test_split(X, y, test_size=0.4, seed=0)
+rng = Mulberry32(1)
+for frac in (0.0, 0.1, 0.2):
+    flip = np.array([rng.random() < frac for _ in y_tr])
+    yy = np.where(flip, 1 - y_tr, y_tr)
+    acc = {}
+    for loss in ("exponential", "log_loss"):
+        m = GradientBoostingClassifier(loss=loss, n_estimators=300, learning_rate=0.1, max_depth=2).fit(X_tr, yy)
+        acc[loss] = m.score(X_te, y_te)
+    print(f"шум {frac:.0%}: экспоненциальные {acc['exponential']:.3f}, логистические {acc['log_loss']:.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Бустинг строит аддитивную модель жадно: по одному слагаемому, минимизируя потери.</li>
+    <li>С квадратичными потерями шаг — подгонка к остаткам; с экспоненциальными — ровно AdaBoost.</li>
+    <li>Экспоненциальные потери взрываются на ошибках, логистические растут линейно.</li>
+    <li>Для произвольных потерь шаг FSAM неразрешим явно — нужен градиент. Это и есть градиентный бустинг.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Во что превращается шаг FSAM с квадратичными потерями?", "options": ["В подгонку нового слагаемого к остаткам y − F_{m−1}(x)", "В AdaBoost", "В бэггинг"], "answer": 0, "explain": "(y − F_{m−1} − βb)² — задача наименьших квадратов для остатков."},
+    {"q": "Чему соответствуют веса объектов AdaBoost с точки зрения FSAM?", "options": ["Экспоненциальным потерям объекта на текущем ансамбле e^{−yF}", "Случайным числам", "Долям классов"], "answer": 0, "explain": "w_i ∝ exp(−y_i F_{m−1}(x_i))."},
+    {"q": "Отступ yF = −3. Что больше: экспоненциальные или логистические потери?", "options": ["Экспоненциальные (e³ ≈ 20)", "Логистические", "Равны"], "answer": 0, "explain": "e³ ≈ 20.1, а log(1 + e⁶) ≈ 6.0 — экспоненциальные гораздо сильнее штрафуют уверенные ошибки."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_9_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>9.1 XGBoost на практике</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Устройство XGBoost мы разобрали в модуле <a data-lesson="lesson_8"></a>. Теперь — ремесло: как его запускать, останавливать, проверять и объяснять. У каждого шага есть подвохи, из-за которых модель тихо получается хуже, чем могла бы.</p>
+</section>
+
+<section id="api">
+  <h2>Два интерфейса</h2>
+  <div class="bones" data-title="Интерфейсы XGBoost по косточкам">
+    <details class="bone" open><summary>sklearn-обёртка: XGBRegressor / XGBClassifier</summary><div class="bone-body">
+      <p>Параметры задаются в конструкторе, обучение — <code>fit(X, y, eval_set=[(X_val, y_val)])</code>. Модель совместима с <code>Pipeline</code>, <code>GridSearchCV</code>, <code>cross_val_score</code>. Число деревьев — <code>n_estimators</code> (по умолчанию 100).</p>
+    </div></details>
+    <details class="bone"><summary>Нативный: xgb.train и DMatrix</summary><div class="bone-body">
+      <p>Данные упаковываются в <code>xgb.DMatrix(X, label=y)</code> — внутренний формат с готовыми гистограммами и поддержкой пропусков. Параметры передаются словарём, число деревьев — <code>num_boost_round</code> (по умолчанию <b>10</b>, а не 100!). Даёт доступ ко всему: своим целевым функциям (урок <a data-lesson="lesson_10_3"></a>), продолжению обучения, внешней памяти.</p>
+    </div></details>
+    <details class="bone"><summary>Одно и то же, разные имена</summary><div class="bone-body">
+      <p><code>learning_rate</code> ↔ <code>eta</code>, <code>reg_lambda</code> ↔ <code>lambda</code>, <code>reg_alpha</code> ↔ <code>alpha</code>, <code>n_estimators</code> ↔ <code>num_boost_round</code>. На одних данных и параметрах оба интерфейса дают одинаковые деревья (проверено в ноутбуке урока).</p>
+    </div></details>
+  </div>
+</section>
+
+<section id="early">
+  <h2>Ранняя остановка</h2>
+  <p>В XGBoost 2 и новее <code>early_stopping_rounds</code> и <code>eval_metric</code> задаются в конструкторе. Если за указанное число деревьев метрика на <b>последнем</b> наборе из <code>eval_set</code> не улучшилась, обучение останавливается.</p>
+  <ul>
+    <li><code>best_iteration</code> считается с нуля: <code>best_iteration = 99</code> означает 100 деревьев.</li>
+    <li>XGBoost <b>не удаляет</b> лишние деревья: в модели их <code>best_iteration + 1 + early_stopping_rounds</code>. Но <code>predict</code> sklearn-обёртки сам использует только лучшие. В нативном интерфейсе нужно передать <code>iteration_range=(0, best_iteration + 1)</code>.</li>
+    <li><code>gbcourse</code> поступает иначе — обрезает модель до лучшей итерации, а <code>best_iteration_</code> там — число деревьев.</li>
+  </ul>
+  <div class="callout warn"><p>Набор, по которому останавливаемся, участвовал в выборе модели. Для честной итоговой оценки нужен третий, отложенный набор (урок <a data-lesson="lesson_7_1"></a>).</p></div>
+</section>
+
+<section id="lab">
+  <h2>Лаборатория</h2>
+  <p>Параметры названы как в XGBoost. Под капотом — наш движок в режиме newton с точным перебором, то есть алгоритм XGBoost <code>tree_method="exact"</code>. Кнопка «Python» выдаёт код, который воспроизводит эксперимент в настоящем XGBoost.</p>
+  <p>Цифры будут близки, но не обязаны совпасть. В маленьких узлах глубоких деревьев часто бывают разбиения с равным выигрышем: например, узел из двух объектов делится по любому признаку одинаково. Библиотеки разрешают такую ничью по-разному, и на обучающих данных это незаметно, а на новых — заметно. В ноутбуке урока без γ прогнозы на обучении совпадают до $10^{-5}$ (глубина 3), а на валидации расходятся до 0.19. С γ &gt; 0 добавляется разница в отсечении ветвей (урок <a data-lesson="lesson_7_3"></a>).</p>
+  <div data-widget="xgb-lab"></div>
+</section>
+
+<section id="importance">
+  <h2>Пять видов важности</h2>
+  <p><code>booster.get_score(importance_type=...)</code> считает важность признака по всем узлам, где он использован для разбиения:</p>
+  <table>
+    <thead><tr><th>Тип</th><th>Что считает</th><th>Когда полезен</th></tr></thead>
+    <tbody>
+      <tr><td><code>weight</code></td><td>сколько раз признак использован для разбиения</td><td>почти никогда: непрерывные шумовые признаки дают много мелких разбиений</td></tr>
+      <tr><td><code>gain</code></td><td>средний выигрыш разбиений по признаку</td><td>по умолчанию в <code>feature_importances_</code> (нормирован на сумму 1)</td></tr>
+      <tr><td><code>total_gain</code></td><td>суммарный выигрыш</td><td>вклад признака в уменьшение потерь целиком</td></tr>
+      <tr><td><code>cover</code></td><td>средняя сумма гессианов $H$ в узлах</td><td>сколько «объектов» проходит через разбиения по признаку</td></tr>
+      <tr><td><code>total_cover</code></td><td>суммарная $H$</td><td>редко</td></tr>
+    </tbody>
+  </table>
+  <p>В задаче Фридмана признаки $x_5, \dots, x_9$ — чистый шум. XGBoost с ранней остановкой (75 деревьев, ν = 0.3) использовал их 207–268 раз, а информативный $x_3$ — самый сильный признак задачи — всего 292 раза. По частоте шум почти неотличим от сигнала. По <code>total_gain</code> разница в десятки раз: 176–270 против 2498–13201 у информативных. Но и gain-важности — лишь эвристика обучающей выборки. Более надёжные способы (перестановочная важность, SHAP) — в модуле <a data-lesson="lesson_12"></a>.</p>
+</section>
+
+<section id="more">
+  <h2>Ещё три вещи, которые нужны каждый день</h2>
+  <div class="bones" data-title="Практика по косточкам">
+    <details class="bone" open><summary>Категориальные признаки</summary><div class="bone-body"><p>Столбец pandas с типом <code>category</code> и <code>enable_categorical=True</code>: XGBoost ищет разбиения вида «категория ∈ множество» (при <code>tree_method="hist"</code>). Подробно о категориях — урок <a data-lesson="lesson_10_1"></a>.</p></div></details>
+    <details class="bone"><summary>Пропуски</summary><div class="bone-body"><p>По умолчанию пропуск — это <code>np.nan</code> (параметр <code>missing</code>). Направление по умолчанию выбирается в каждом узле (урок <a data-lesson="lesson_8_3"></a>).</p></div></details>
+    <details class="bone"><summary>Сохранение модели</summary><div class="bone-body"><p><code>model.save_model("model.json")</code> или <code>.ubj</code> (двоичный JSON) — переносимый формат, не зависящий от версии Python. <code>pickle</code> сохраняет весь объект Python и может не загрузиться в другой версии XGBoost.</p></div></details>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Ранняя остановка и важности в XGBoost">
+<pre><code class="language-python">import numpy as np
+import xgboost as xgb
+from gbcourse import datasets
+
+X, y = datasets.friedman1(n=1000, noise=1.0, seed=92)
+X_tr, X_val, y_tr, y_val = X[:700], X[700:], y[:700], y[700:]
+
+model = xgb.XGBRegressor(n_estimators=1000, learning_rate=0.3, early_stopping_rounds=20, eval_metric="rmse")
+model.fit(X_tr, y_tr, eval_set=[(X_val, y_val)], verbose=False)
+print("лучшая итерация (с нуля):", model.best_iteration, "| деревьев в модели:", model.get_booster().num_boosted_rounds())
+
+booster = model.get_booster()
+for kind in ("weight", "total_gain"):
+    score = booster.get_score(importance_type=kind)
+    print(f"{kind:10s}", {k: round(v) for k, v in score.items()})</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>sklearn-обёртка удобна для конвейеров; нативный <code>xgb.train</code> даёт полный контроль. У <code>num_boost_round</code> по умолчанию всего 10 деревьев.</li>
+    <li>После ранней остановки XGBoost хранит лишние деревья; sklearn-<code>predict</code> их игнорирует, нативный — нет.</li>
+    <li>Важность <code>weight</code> обманчива; <code>gain</code> и <code>total_gain</code> лучше, но это тоже эвристика.</li>
+    <li>Сохраняйте модель в JSON/UBJ, а не через pickle.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "model.best_iteration = 49 после ранней остановки с early_stopping_rounds = 10. Сколько деревьев в модели и сколько использует sklearn-predict?", "options": ["50 и 50", "60 и 50", "60 и 60"], "answer": 1, "explain": "Лучших деревьев 50 (нумерация с нуля), ещё 10 без улучшения остаются в модели, но predict их не использует."},
+    {"q": "Какой вид важности сильнее всего переоценивает непрерывные шумовые признаки?", "options": ["weight", "total_gain", "gain"], "answer": 0, "explain": "Шумовые признаки часто используются для мелких разбиений с малым выигрышем."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

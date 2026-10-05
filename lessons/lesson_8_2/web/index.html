@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_8_2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>8.2 Регуляризованная цель: веса листьев и выигрыш разбиения</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">В этом уроке мы выведем две формулы, на которых стоит XGBoost (а вслед за ним LightGBM и CatBoost): значение листа и выигрыш разбиения. Вывод занимает пять строк, и каждая строка — отдельная косточка.</p>
+</section>
+
+<section id="derivation">
+  <h2>Вывод по шагам</h2>
+  <div class="bones" data-title="Формулы XGBoost по косточкам">
+    <details class="bone" open><summary>1. Цель одной итерации</summary><div class="bone-body">
+      <p>Модель $F$ уже построена, ищем новое дерево $f$:</p>
+      <div class="formula">$$\mathcal{L}(f) = \sum_{i=1}^{n} L\big(y_i, F_i + f(x_i)\big) + \Omega(f), \qquad \Omega(f) = \gamma T + \tfrac{\lambda}{2}\sum_{j=1}^{T} w_j^2.$$</div>
+      <p>Первое слагаемое — насколько хорошо, второе — насколько сложно. $T$ — число листьев, $w_j$ — их значения. (L1-штраф α для краткости опустим; с ним $G$ заменяется на $T_\alpha(G)$, см. урок <a data-lesson="lesson_7_3"></a>.)</p>
+    </div></details>
+    <details class="bone"><summary>2. Квадратичное приближение</summary><div class="bone-body">
+      <p>Раскладываем каждое слагаемое по Тейлору (урок <a data-lesson="lesson_8_1"></a>) и отбрасываем константу $\sum L(y_i, F_i)$:</p>
+      <div class="formula">$$\tilde{\mathcal{L}}(f) = \sum_{i=1}^{n} \Big[g_i f(x_i) + \tfrac12 h_i f(x_i)^2\Big] + \gamma T + \tfrac{\lambda}{2}\sum_{j} w_j^2.$$</div>
+    </div></details>
+    <details class="bone"><summary>3. Группировка по листьям</summary><div class="bone-body">
+      <p>Дерево даёт всем объектам листа $j$ одно и то же значение: $f(x_i) = w_j$ для $i \in I_j$. Соберём слагаемые по листьям, обозначив $G_j = \sum_{i \in I_j} g_i$ и $H_j = \sum_{i \in I_j} h_i$:</p>
+      <div class="formula">$$\tilde{\mathcal{L}} = \sum_{j=1}^{T}\Big[G_j w_j + \tfrac12 (H_j + \lambda)\, w_j^2\Big] + \gamma T.$$</div>
+      <p>Цель распалась на $T$ <b>независимых</b> парабол — по одной на лист. Объекты больше не нужны, только суммы $G_j, H_j$.</p>
+    </div></details>
+    <details class="bone"><summary>4. Оптимальные веса листьев и качество структуры</summary><div class="bone-body">
+      <p>Минимум каждой параболы и значение цели в минимуме:</p>
+      <div class="formula">$$w_j^* = -\frac{G_j}{H_j + \lambda}, \qquad \tilde{\mathcal{L}}^* = -\frac12 \sum_{j=1}^{T} \frac{G_j^2}{H_j + \lambda} + \gamma T.$$</div>
+      <p>$\tilde{\mathcal{L}}^*$ — «качество структуры» (structure score): насколько хорошо дерево с таким разбиением на листья может уменьшить цель, если листьям дать лучшие значения. Чем меньше, тем лучше.</p>
+    </div></details>
+    <details class="bone"><summary>5. Выигрыш разбиения</summary><div class="bone-body">
+      <p>Лист с суммами $(G, H)$ делим на левую $(G_L, H_L)$ и правую $(G_R, H_R)$ части. Выигрыш — насколько уменьшится $\tilde{\mathcal{L}}^*$: из дерева уходит один лист и появляются два (+1 к $T$):</p>
+      <div class="formula">$$\text{gain} = \frac12\left[\frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} - \frac{(G_L + G_R)^2}{H_L + H_R + \lambda}\right] - \gamma.$$</div>
+      <p>Первые два слагаемых — качество новых листьев, третье — старого, γ — цена дополнительного листа. Разбиение выгодно, только если gain &gt; 0.</p>
+    </div></details>
+  </div>
+</section>
+
+<section id="by-hand">
+  <h2>Первая итерация вручную</h2>
+  <p>Игрушечные данные: $x = 1, \dots, 6$, $y = (2, 4, 3, 7, 9, 11)$, квадратичная потеря, λ = 1. Старт $F_0 = \bar y = 6$, значит $g_i = F_0 - y_i = (4, 2, 3, -1, -3, -5)$, $h_i = 1$. В корне $G = 0$, $H = 6$, поэтому последнее слагаемое выигрыша равно нулю.</p>
+  <table>
+    <thead><tr><th>Порог</th><th>$G_L$</th><th>$H_L$</th><th>$G_R$</th><th>$H_R$</th><th>$w_L$</th><th>$w_R$</th><th>gain</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1.5</td><td class="num">+4</td><td class="num">1</td><td class="num">−4</td><td class="num">5</td><td class="num">−2.000</td><td class="num">+0.667</td><td class="num">5.333</td></tr>
+      <tr><td class="num">2.5</td><td class="num">+6</td><td class="num">2</td><td class="num">−6</td><td class="num">4</td><td class="num">−2.000</td><td class="num">+1.200</td><td class="num">9.600</td></tr>
+      <tr><td class="num"><b>3.5</b></td><td class="num">+9</td><td class="num">3</td><td class="num">−9</td><td class="num">3</td><td class="num">−2.250</td><td class="num">+2.250</td><td class="num"><b>20.250</b></td></tr>
+      <tr><td class="num">4.5</td><td class="num">+8</td><td class="num">4</td><td class="num">−8</td><td class="num">2</td><td class="num">−1.600</td><td class="num">+2.667</td><td class="num">17.067</td></tr>
+      <tr><td class="num">5.5</td><td class="num">+5</td><td class="num">5</td><td class="num">−5</td><td class="num">1</td><td class="num">−0.833</td><td class="num">+2.500</td><td class="num">8.333</td></tr>
+    </tbody>
+  </table>
+  <p>Например, для порога 3.5: $\frac12\big[\frac{9^2}{3+1} + \frac{9^2}{3+1} - 0\big] = \frac12 (20.25 + 20.25) = 20.25$. Без λ листья получили бы средние остатки $\mp 3$, λ = 1 сжимает их до $\mp 2.25$.</p>
+</section>
+
+<section id="explore">
+  <h2>Выигрыш по всем порогам</h2>
+  <div data-widget="split-gain"></div>
+</section>
+
+<section id="xgb">
+  <h2>Как это выглядит в XGBoost</h2>
+  <p>В выгрузке дерева (<code>get_dump(with_stats=True)</code> или <code>trees_to_dataframe()</code>) у каждого узла есть два числа:</p>
+  <ul>
+    <li><code>cover</code> — это $H$, сумма гессианов в узле. Для квадратичной потери — просто число объектов. С ней и сравнивается <code>min_child_weight</code>.</li>
+    <li><code>gain</code> — выигрыш разбиения, но <b>без множителя ½</b>: XGBoost хранит $\frac{G_L^2}{H_L+\lambda} + \frac{G_R^2}{H_R+\lambda} - \frac{G^2}{H+\lambda}$. С этим удвоенным числом сравнивается <code>gamma</code>. Так что <code>gamma</code> XGBoost = 2 × γ из статьи и из <code>gbcourse</code>.</li>
+  </ul>
+  <div class="pycell" data-title="Сверяем gain и cover с XGBoost">
+<pre><code class="language-python">import numpy as np
+import pandas  # нужен для trees_to_dataframe()
+import xgboost as xgb
+from gbcourse import datasets, RegressionTree
+
+X, y = datasets.toy_regression()
+ours = RegressionTree(max_depth=1, reg_lambda=1.0).fit(X, y.mean() - y)
+ref = xgb.XGBRegressor(n_estimators=1, learning_rate=1.0, max_depth=1, reg_lambda=1.0,
+                       min_child_weight=0, tree_method="exact", base_score=float(y.mean())).fit(X, y)
+df = ref.get_booster().trees_to_dataframe()
+root = df[df.Node == 0].iloc[0]
+print("порог:", ours.nodes[0].threshold, "| XGBoost:", root.Split)
+print("gain:  ", ours.nodes[0].gain, "| XGBoost:", root.Gain, "(ровно вдвое больше)")
+print("cover (H):", ours.nodes[0].H, "| XGBoost:", root.Cover)
+print("листья:", [lf.value for lf in ours.leaves], "| XGBoost:", df[df.Feature == "Leaf"].Gain.tolist())</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>После квадратичного приближения цель распадается на независимые параболы по листьям.</li>
+    <li>$w^* = -G/(H+\lambda)$; качество структуры $-\frac12\sum G^2/(H+\lambda) + \gamma T$.</li>
+    <li>Выигрыш разбиения — уменьшение качества структуры минус γ; в XGBoost он хранится без ½.</li>
+    <li>Всё дерево строится по двум суммам на узел — это делает поиск разбиений быстрым (урок <a data-lesson="lesson_8_3"></a>).</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Лист: G = −6, H = 2, λ = 1. Его оптимальный вес?", "options": ["3", "2", "−2"], "answer": 1, "explain": "w = −G/(H + λ) = 6/3 = 2."},
+    {"q": "В корне G = 0. Чему равно последнее слагаемое выигрыша G²/(H + λ)?", "options": ["нулю", "H", "λ"], "answer": 0, "explain": "Так всегда в первом дереве для квадратичной потери со стартом F₀ = среднее."},
+    {"q": "Выигрыш разбиения по формуле статьи 3.0. Сколько покажет XGBoost в поле gain?", "options": ["1.5", "3.0", "6.0"], "answer": 2, "explain": "XGBoost хранит выигрыш без множителя ½."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

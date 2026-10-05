@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_10_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>10.1 Категориальные признаки</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="results.js,lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Город, марка, категория товара, ID магазина — в табличных данных категорий больше, чем чисел. Способов подать их бустингу много, и выбор между ними заметно влияет на качество. В наших экспериментах разница между лучшим и худшим способом превышала 30%.</p>
+</section>
+
+<section id="ways">
+  <h2>Способы по косточкам</h2>
+  <div class="bones" data-title="Кодирование категорий по косточкам">
+    <details class="bone" open><summary>Порядковые коды</summary><div class="bone-body"><p>Категории нумеруются 0, 1, 2, … и подаются как число. Дерево может делить только по порогу, то есть на «коды до t» и «после t». Если порядок кодов случаен, для выделения нужной группы нужны многие разбиения.</p></div></details>
+    <details class="bone"><summary>One-hot</summary><div class="bone-body"><p>По столбцу на значение. Каждое разбиение отделяет одну категорию от всех остальных — «одна против всех». При большом K это много редких столбцов и много мелких разбиений.</p></div></details>
+    <details class="bone"><summary>Кодирование средним (target encoding)</summary><div class="bone-body"><p>Категория заменяется сглаженным средним $y$: $\frac{\sum y + a\,p}{n + a}$. Наивный вариант (по всей обучающей выборке) даёт утечку, по фолдам — нет (урок <a data-lesson="lesson_9_3"></a>).</p></div></details>
+    <details class="bone"><summary>Встроенная обработка</summary><div class="bone-body"><p>LightGBM и XGBoost ищут разбиение вида «категория ∈ S» прямо в узле, CatBoost использует упорядоченные статистики. Как можно найти лучшее множество $S$ среди $2^{K-1} - 1$ вариантов — ниже.</p></div></details>
+  </div>
+</section>
+
+<section id="fisher">
+  <h2>Как найти лучшее множество категорий</h2>
+  <p>В узле у каждой категории $k$ есть суммы $G_k$ и $H_k$. Разбиение категорий на группы $S$ и $\bar S$ оценивается обычным выигрышем $\frac{G_S^2}{H_S} + \frac{G_{\bar S}^2}{H_{\bar S}}$. Перебор всех групп — $2^{K-1} - 1$ вариантов: при $K = 30$ это полмиллиарда.</p>
+  <p><b>Теорема (Фишер, 1958; Брейман и др., 1984).</b> Упорядочим категории по $G_k / H_k$ — среднему градиенту в категории. Тогда лучшая группа $S$ состоит из нескольких первых категорий этого порядка. Достаточно проверить $K - 1$ порогов, как у числового признака.</p>
+  <div data-widget="category-partition"></div>
+  <p>Именно так работает LightGBM: сортирует категории по $G_k / (H_k + \text{cat\_smooth})$ и проверяет пороги с обеих сторон. Это точное решение для одного узла, но и опасность. При многих редких категориях сортировка по шумным средним легко находит «идеальное» разбиение обучающих данных. Поэтому LightGBM требует минимум <code>min_data_per_group = 100</code> объектов в группе, сглаживает <code>cat_smooth = 10</code>, проверяет не больше <code>max_cat_threshold = 32</code> порогов. При $K \le$ <code>max_cat_to_onehot = 4</code> используются разбиения «одна против всех». В XGBoost (<code>enable_categorical=True</code>) похожий алгоритм: <code>max_cat_to_onehot = 4</code>, а <code>max_cat_threshold = 64</code> ограничивает число категорий в одной группе. Все значения проверены в ноутбуке урока.</p>
+</section>
+
+<section id="experiment">
+  <h2>Что лучше на практике</h2>
+  <p>Данные: $y$ = эффект категории + $\sin x$ + шум с σ = 1 (значит, RMSE не может быть меньше 1). Частоты категорий убывают: много редких. 6000 объектов, разбиение 60/20/20, три повтора, темп 0.05 с ранней остановкой. Кодирования средним и one-hot подаются в LightGBM.</p>
+  <div data-widget="encoding-results"></div>
+  <div class="bones" data-title="Выводы по косточкам">
+    <details class="bone" open><summary>При 10 значениях всё равно</summary><div class="bone-body"><p>Все способы дают 0.97–0.98. При малом K любой способ позволяет деревьям выделить нужные группы.</p></div></details>
+    <details class="bone"><summary>При 100 значениях — встроенная LightGBM и кодирование средним</summary><div class="bone-body"><p>LightGBM встроенная 1.016, кодирование средним 1.026–1.030, XGBoost 1.034, CatBoost 1.047. Порядковые коды хуже (1.066), one-hot — худший (1.166).</p></div></details>
+    <details class="bone"><summary>При 1000 значениях — ни один способ не лучший всегда</summary><div class="bone-body"><p>Категория информативна: лучшие — встроенная XGBoost (1.295) и кодирование средним (1.297–1.312). Встроенная LightGBM (1.707) почти так же плоха, как порядковые коды (1.689): ограничение <code>min_data_per_group = 100</code> не даёт выделять редкие категории. Категория — шум: встроенная XGBoost переобучается сильнее всех (1.123 при 1.020 без категории), наивное среднее — из-за утечки (1.087). Кодирование по фолдам (1.021), CatBoost (1.013) и LightGBM (1.020) безопасны.</p></div></details>
+  </div>
+  <div class="callout note"><p><b>Практический вывод.</b> Кодирование средним по фолдам в этом эксперименте ни разу не было далеко от лучшего и не пострадало от шумовой категории — это надёжный выбор по умолчанию при большом K. Встроенную обработку стоит сравнить с ним на валидации: она может быть лучше (LightGBM при K = 100) или заметно хуже (LightGBM при K = 1000).</p></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Встроенные категории LightGBM и кодирование по фолдам">
+<pre><code class="language-python">import numpy as np
+import pandas as pd
+import lightgbm as lgb
+from gbcourse import datasets
+
+x, c, y = datasets.categorical_regression(n=6000, n_categories=100, noise=1.0, seed=140)
+perm = np.random.default_rng(0).permutation(len(y))
+tr, va, te = perm[:3600], perm[3600:4800], perm[4800:]
+
+def mean_table(c, y, K=100, a=10.0, prior=None):
+    prior = y.mean() if prior is None else prior
+    return (np.bincount(c, y, K) + a * prior) / (np.bincount(c, minlength=K) + a)
+
+prior = y[tr].mean()
+enc = mean_table(c[tr], y[tr], prior=prior)[c]                      # валидация и тест
+fold = np.random.default_rng(0).permutation(len(tr)) % 5
+for f in range(5):                                                     # обучение — по фолдам
+    rows = tr[fold == f]
+    enc[rows] = mean_table(c[tr][fold != f], y[tr][fold != f], prior=prior)[c[rows]]
+
+variants = {"встроенная": pd.DataFrame({"x": x, "c": pd.Categorical(c)}),
+            "среднее по фолдам": pd.DataFrame({"x": x, "enc": enc})}
+for name, D in variants.items():
+    m = lgb.LGBMRegressor(n_estimators=5000, learning_rate=0.05, verbose=-1)
+    m.fit(D.iloc[tr], y[tr], eval_set=[(D.iloc[va], y[va])], callbacks=[lgb.early_stopping(100, verbose=False)])
+    print(f"{name:18s} RMSE на тесте {np.sqrt(np.mean((y[te] - m.predict(D.iloc[te])) ** 2)):.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Лучшее разбиение категорий на две группы находится сортировкой по $G_k/H_k$ — это делают LightGBM и XGBoost.</li>
+    <li>При малом K способ почти не важен; при большом — важен, и ни один не выигрывает всегда.</li>
+    <li>Кодирование средним по фолдам — надёжный выбор по умолчанию; встроенную обработку сравнивайте на валидации.</li>
+    <li>Наивное кодирование средним и встроенная обработка XGBoost переобучаются на шумовых категориях с множеством значений.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Сколько разбиений нужно проверить, чтобы найти лучшее разбиение 20 категорий на две группы (квадратичная потеря)?", "options": ["2¹⁹ − 1 ≈ 524 тысячи", "19 после сортировки по среднему градиенту", "20 разбиений «одна против всех»"], "answer": 1, "explain": "По теореме Фишера лучшая группа — префикс порядка по G/H."},
+    {"q": "Почему встроенная обработка LightGBM плохо справилась с 1000 редкими категориями?", "options": ["она использует one-hot", "min_data_per_group = 100 не даёт выделять маленькие группы", "LightGBM не поддерживает категории"], "answer": 1, "explain": "Редкие категории не набирают 100 объектов, и отдельные эффекты теряются."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

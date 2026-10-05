@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_11">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>11. Настройка гиперпараметров</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="results.js,lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем этот модуль</h2>
+  <p class="lead">У LightGBM больше сотни параметров, у XGBoost и CatBoost — десятки. Перебрать всё невозможно, да и не нужно: на качество заметно влияют несколько, остальные — почти нет. Этот модуль о том, какие параметры важны, в каком порядке их настраивать и как честно сравнивать варианты.</p>
+</section>
+
+<section id="map">
+  <h2>Карта ошибки</h2>
+  <p>LightGBM на задаче Фридмана (4000 объектов, 60/20/20, три повтора), темп × число листьев, ранняя остановка через 100 деревьев без улучшения, <code>min_child_samples = 10</code>. Числа получены скриптом <code>examples/tuning_grid.py</code>.</p>
+  <div data-widget="tuning-map"></div>
+  <div class="bones" data-title="Что видно на карте">
+    <details class="bone" open><summary>Темп почти не влияет на качество — если есть ранняя остановка</summary><div class="bone-body"><p>При 4 листьях ошибка на валидации 1.151 (ν = 0.01), 1.138 (0.03) и 1.137 (0.1) — разница меньше разброса между разбиениями. Зато деревьев нужно 4284, 1792 и 590. Маленький темп — это время, а не точность. Только при ν ≥ 0.3 качество падает: 1.203 при 0.3 и 1.465 при 1.0.</p></div></details>
+    <details class="bone"><summary>Размер деревьев важен и зависит от задачи</summary><div class="bone-body"><p>Пни (2 листа) не умеют взаимодействий: 1.74 при любом темпе. Лучше всего 4 листа: в задаче Фридмана только парное взаимодействие $x_0 x_1$. Дальше рост деревьев ухудшает результат: 128 листьев — 1.40. На другой задаче лучшая сложность будет другой — поэтому её и подбирают.</p></div></details>
+    <details class="bone"><summary>Параметры связаны</summary><div class="bone-body"><p>Лучший темп зависит от размера деревьев, лучшее число деревьев — от темпа. Поэтому настройку «по одному параметру» делают осторожно и в правильном порядке (урок <a data-lesson="lesson_11_1"></a>), а число деревьев почти всегда отдают ранней остановке.</p></div></details>
+  </div>
+</section>
+
+<section id="plan">
+  <h2>Уроки модуля</h2>
+  <div class="bones" data-title="Настройка по косточкам">
+    <details class="bone" open><summary data-go="lesson_11_1">Карта гиперпараметров и стратегия</summary><div class="bone-body"><p>Какие параметры влияют сильнее всего, в каком порядке их настраивать, разумные стартовые значения.</p></div></details>
+    <details class="bone"><summary data-go="lesson_11_2">Кросс-валидация и Optuna</summary><div class="bone-body"><p>Как оценивать вариант, чтобы не обмануться; перебор по сетке, случайный поиск и байесовский (TPE); ранняя остановка неудачных вариантов.</p></div></details>
+  </div>
+  <div data-sublessons></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Темп и число деревьев при ранней остановке">
+<pre><code class="language-python">import numpy as np
+import lightgbm as lgb
+from gbcourse import datasets
+
+X, y = datasets.friedman1(n=4000, noise=1.0, seed=170)
+perm = np.random.default_rng(0).permutation(len(y))
+tr, va = perm[:2400], perm[2400:3200]
+for lr in (0.01, 0.1, 1.0):
+    m = lgb.LGBMRegressor(n_estimators=5000, learning_rate=lr, num_leaves=4, min_child_samples=10, verbose=-1)
+    m.fit(X[tr], y[tr], eval_set=[(X[va], y[va])], callbacks=[lgb.early_stopping(100, verbose=False)])
+    print(f"ν = {lr:<4}: RMSE {np.sqrt(min(m.evals_result_['valid_0']['l2'])):.3f}, деревьев {m.best_iteration_}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>С ранней остановкой темп влияет в основном на время, а не на качество (пока он не слишком велик).</li>
+    <li>Сложность деревьев — главный параметр качества; её лучшее значение зависит от задачи.</li>
+    <li>Разница меньше разброса между разбиениями — не разница.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "С ранней остановкой уменьшили темп с 0.1 до 0.01. Что скорее всего произойдёт?", "options": ["качество заметно вырастет", "качество почти не изменится, деревьев станет примерно в 5–10 раз больше", "модель переобучится"], "answer": 1, "explain": "На карте: 1.137 → 1.151 при росте числа деревьев с 590 до 4284."},
+    {"q": "Почему пни (2 листа) не могут хорошо решить задачу Фридмана?", "options": ["им не хватает деревьев", "сумма пней — сумма функций от отдельных признаков, а в задаче есть взаимодействие x₀x₁", "у них слишком большой темп"], "answer": 1, "explain": "Каждый пень зависит от одного признака, и их сумма не может выразить произведение."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

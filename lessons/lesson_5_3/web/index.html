@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_5_3">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>5.3 Функции потерь для регрессии</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Функция потерь определяет, <em>что именно</em> предсказывает модель. Бустинг с L2 предсказывает условное среднее, с L1 — медиану, с квантильными потерями — любой квантиль. Выбор потерь — это выбор вопроса, на который отвечает модель.</p>
+</section>
+
+<section id="cards">
+  <h2>Четыре карточки</h2>
+  <table>
+    <thead><tr><th></th><th>L2</th><th>L1</th><th>Хьюбер (δ)</th><th>Квантильная (α)</th></tr></thead>
+    <tbody>
+      <tr><td>$L(y, F)$, $r = y - F$</td><td>$\tfrac12 r^2$</td><td>$|r|$</td><td>$\tfrac12 r^2$ / $\delta(|r| - \tfrac\delta2)$</td><td>$\max(\alpha r, (\alpha-1) r)$</td></tr>
+      <tr><td>$F_0$</td><td>среднее</td><td>медиана</td><td>медиана</td><td>α-квантиль</td></tr>
+      <tr><td>Псевдо-остаток</td><td>$r$</td><td>$\operatorname{sign} r$</td><td>$r$, обрезанный до $\pm\delta$</td><td>$\alpha$ или $\alpha - 1$</td></tr>
+      <tr><td>Значение листа</td><td>среднее $r$</td><td>медиана $r$</td><td>медиана + поправка</td><td>α-квантиль $r$</td></tr>
+      <tr><td>Предсказывает</td><td>$\mathbb E[y\mid x]$</td><td>$\mathrm{median}[y\mid x]$</td><td>устойчивый «центр»</td><td>$q_\alpha[y\mid x]$</td></tr>
+      <tr><td>Выбросы в $y$</td><td>чувствительна</td><td>устойчива</td><td>устойчива (зависит от δ)</td><td>устойчива</td></tr>
+    </tbody>
+  </table>
+  <div data-widget="loss-explorer" data-config='{"losses": ["squared", "absolute", "huber", "quantile"]}'></div>
+</section>
+
+<section id="robust">
+  <h2>Устойчивость к выбросам</h2>
+  <p>С L2 каждый выброс создаёт огромный псевдо-остаток, и деревья тратят листья на то, чтобы его «поймать». С L1 выброс — просто ещё один знак «+1»: его голос равен голосу обычной точки. Хьюбер ведёт себя как L2 у центра (эффективно на чистых данных) и как L1 на хвостах.</p>
+  <div class="callout tip"><p><strong>Как выбрать δ для Хьюбера?</strong> Порядка типичного размера нормальной ошибки: например, 1.35·σ шума (95% эффективности L2 на нормальном шуме). scikit-learn по умолчанию подбирает δ адаптивно — как квантиль уровня <code>alpha=0.9</code> модулей текущих остатков — и пересчитывает на каждой итерации.</p></div>
+</section>
+
+<section id="intervals">
+  <h2>Предсказательные интервалы квантильным бустингом</h2>
+  <p>Обучим две модели: на квантиль 0.1 и на квантиль 0.9. Между ними — интервал, который должен содержать около 80% новых наблюдений. Шум в данных растёт с $x$ — хорошая модель интервала должна расширяться.</p>
+  <div data-widget="quantile-band"></div>
+  <div class="callout warning">
+    <p><strong>Три ловушки квантильных интервалов:</strong></p>
+    <ol>
+      <li><em>Покрытие на обучении оптимистично</em> — проверяйте на отложенных данных (виджет считает покрытие на новых точках).</li>
+      <li><em>Квантили могут пересекаться</em>: модели обучаются независимо, и в отдельных точках $q_{0.1} &gt; q_{0.9}$. Лечится сортировкой прогнозов.</li>
+      <li><em>Гарантий нет</em>: для строгого покрытия используют конформные методы поверх любой модели (урок <a data-lesson="lesson_13_2"></a>).</li>
+    </ol>
+  </div>
+</section>
+
+<section id="choose">
+  <h2>Как выбрать потери</h2>
+  <div class="bones" data-title="Выбор функции потерь по косточкам">
+    <details class="bone" open><summary>Какой ответ нужен бизнесу?</summary><div class="bone-body">
+      <details class="bone"><summary>Среднее (план продаж, сумма по многим объектам)</summary><div class="bone-body"><p>L2: ошибки усредняются, итоговая сумма несмещена.</p></div></details>
+      <details class="bone"><summary>Типичное значение (время доставки, цена «обычной» квартиры)</summary><div class="bone-body"><p>L1 или Хьюбер: не зависит от редких экстремумов.</p></div></details>
+      <details class="bone"><summary>Запас с заданной надёжностью (склад, мощности)</summary><div class="bone-body"><p>Квантильная с α = доля случаев, когда запаса должно хватить.</p></div></details>
+    </div></details>
+    <details class="bone"><summary>Есть ли в y выбросы или ошибки разметки?</summary><div class="bone-body"><p>Да → Хьюбер или L1. Нет → L2 обычно эффективнее.</p></div></details>
+    <details class="bone"><summary data-go="lesson_10_3">Нестандартная цена ошибки?</summary><div class="bone-body"><p>Напишите свою функцию потерь: нужны градиент (и для XGBoost — гессиан).</p></div></details>
+    <details class="bone"><summary>Счётные данные (число покупок, звонков)?</summary><div class="bone-body"><p>Пуассоновские потери: прогноз всегда положителен, $F = \log\mu$.</p></div></details>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Интервал 10–90% и его покрытие">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, GBRegressor
+
+X, y = datasets.regression_1d(kind="hetero", n=400, noise=0.5, seed=54)
+X_te, y_te = datasets.regression_1d(kind="hetero", n=2000, noise=0.5, seed=55)
+q = {}
+for a in (0.1, 0.5, 0.9):
+    q[a] = GBRegressor(loss="quantile", quantile_alpha=a, n_estimators=200, learning_rate=0.1, max_depth=2).fit(X, y)
+lo, hi = q[0.1].predict(X_te), q[0.9].predict(X_te)
+lo, hi = np.minimum(lo, hi), np.maximum(lo, hi)          # защита от пересечения квантилей
+print("покрытие интервала на новых данных:", np.mean((y_te >= lo) & (y_te <= hi)).round(3), "(цель 0.8)")
+for part, mask in (("x < 3", X_te[:, 0] < 3), ("x > 7", X_te[:, 0] > 7)):
+    print(f"  средняя ширина при {part}: {np.mean(hi[mask] - lo[mask]):.2f}")</code></pre>
+  </div>
+  <p>То же в scikit-learn: <code>GradientBoostingRegressor(loss="quantile", alpha=0.9)</code>; в LightGBM — <code>objective="quantile", alpha=0.9</code>; в XGBoost ≥ 2.0 — <code>objective="reg:quantileerror", quantile_alpha=[0.1, 0.9]</code> (несколько квантилей одной моделью).</p>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Потери определяют, что предсказывает модель: среднее (L2), медиану (L1), квантиль (квантильная).</li>
+    <li>L1 и Хьюбер устойчивы к выбросам; L2 эффективнее на чистых данных.</li>
+    <li>Пара квантильных моделей даёт интервал; проверяйте покрытие на новых данных и следите за пересечениями.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Бустинг с квантильными потерями α = 0.95 предсказывает…", "options": ["значение, которое y превышает лишь в ~5% случаев", "среднее плюс 5%", "95% от среднего"], "answer": 0, "explain": "Это 0.95-квантиль условного распределения y."},
+    {"q": "Интервал из квантилей 0.1 и 0.9 на обучении содержит 88% точек. Что ожидать на новых данных?", "options": ["Тоже 88%", "Скорее меньше — оценка на обучении оптимистична", "Ровно 80%"], "answer": 1, "explain": "Модели подогнаны к обучающим точкам; честное покрытие — на отложенных."},
+    {"q": "Почему псевдо-остатки квантильных потерь принимают всего два значения?", "options": ["Потери кусочно-линейны: производная равна α или α − 1", "Из-за ошибки округления", "Потому что y бинарный"], "answer": 0, "explain": "Как у L1, величина ошибки в градиент не входит."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "id": "lesson_9_2",
+  "title": "LightGBM: рост по листьям, GOSS и связывание признаков",
+  "short": "LightGBM",
+  "subtitle": "Три идеи Microsoft: растить дерево там, где выгоднее всего; учиться на объектах с большими градиентами; склеивать редкие признаки",
+  "summary": "Рост по листьям (leaf-wise) против роста по уровням и почему в LightGBM главный параметр — num_leaves; выборка по градиентам GOSS: когда она точнее равномерной подвыборки и почему не обязательно быстрее; связывание взаимоисключающих признаков EFB. Все утверждения проверены на LightGBM 4.7.",
+  "level": 3,
+  "duration": 45,
+  "prerequisites": ["lesson_9", "lesson_8_3", "lesson_7_2"],
+  "objectives": [
+    "объяснить рост по листьям и настроить num_leaves, min_child_samples и max_depth",
+    "описать GOSS и условия, при которых он лучше равномерной подвыборки",
+    "объяснить идею EFB и когда она ускоряет обучение"
+  ],
+  "keywords": ["LightGBM", "leaf-wise", "num_leaves", "min_child_samples", "GOSS", "EFB", "data_sample_strategy"],
+  "datasets": [
+    {
+      "file": "data/friedman1_1000.csv",
+      "generator": "friedman1",
+      "params": {"n": 1000, "noise": 1.0, "seed": 94},
+      "title": "Задача Фридмана, 1000 объектов",
+      "description": "Небольшая выборка, на которой видно переобучение при большом num_leaves."
+    }
+  ]
+}

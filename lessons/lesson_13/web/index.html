@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_13">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>13. Продвинутые задачи</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем этот модуль</h2>
+  <p class="lead">До сих пор модель отвечала на вопрос «сколько?» или «какой класс?». В реальных системах вопросы другие: в каком порядке показать товары, насколько можно доверять прогнозу, что делать, когда данные изменились. Бустинг справляется и с этим, но требует других потерь, метрик и процедур.</p>
+</section>
+
+<section id="demo">
+  <h2>Точность не видит главного</h2>
+  <p>Вероятность 0.9 должна означать: среди таких объектов 90% — класса 1. Это свойство называется <b>калибровкой</b>. Проверяют её <b>диаграммой надёжности</b>: объекты делят по прогнозу на корзины (0–0.1, 0.1–0.2, …) и сравнивают средний прогноз в корзине с реальной долей класса 1. У честной модели точки лежат на диагонали.</p>
+  <div data-widget="reliability"></div>
+  <p>Двигайте число деревьев. При ν = 0.3 и глубине 4 модель быстро переобучается: точность на тесте почти не меняется (0.872 при 10 деревьях, 0.853 при 500). Но ожидаемая ошибка калибровки (ECE) растёт с 0.02 до 0.13, а log-loss — с 0.33 до 1.23. Модель становится самоуверенной: «0.99» у неё сбывается гораздо реже, чем в 99% случаев. Если по этим вероятностям считать риски или цены — будут ошибки.</p>
+  <div class="formula">$$\mathrm{ECE} = \sum_{b} \frac{n_b}{n}\,\big|\,\bar p_b - \bar y_b\,\big|$$</div>
+</section>
+
+<section id="map">
+  <h2>Уроки модуля</h2>
+  <div class="bones" data-title="Продвинутые задачи по косточкам">
+    <details class="bone" open><summary data-go="lesson_13_1">Ранжирование: LambdaMART</summary><div class="bone-body"><p>Порядок важнее значений: метрика NDCG, попарные потери, «лямбды» и почему LambdaMART — это бустинг с особыми градиентами.</p></div></details>
+    <details class="bone"><summary data-go="lesson_13_2">Калибровка и неопределённость</summary><div class="bone-body"><p>Калибровка Платта и изотоническая, интервалы через квантили, конформные интервалы с гарантией покрытия.</p></div></details>
+    <details class="bone"><summary data-go="lesson_13_3">Бустинг в эксплуатации</summary><div class="bone-body"><p>Сохранение и версии, скорость прогноза, сдвиг данных и мониторинг, переобучение.</p></div></details>
+  </div>
+  <div data-sublessons></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="ECE и log-loss по мере роста числа деревьев">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, GBClassifier
+
+X, y = datasets.classification_2d(kind="moons", n=600, noise=0.35, seed=190)
+X_te, y_te = datasets.classification_2d(kind="moons", n=3000, noise=0.35, seed=191)
+m = GBClassifier(n_estimators=500, learning_rate=0.3, max_depth=4).fit(X, y)
+
+def ece(y, p, bins=10):
+    idx = np.minimum((p * bins).astype(int), bins - 1)
+    return sum(np.mean(idx == b) * abs(p[idx == b].mean() - y[idx == b].mean()) for b in range(bins) if np.any(idx == b))
+
+for k in (10, 100, 500):
+    p = 1 / (1 + np.exp(-m.predict_raw(X_te, k)))
+    ll = -np.mean(y_te * np.log(p) + (1 - y_te) * np.log(1 - p))
+    print(f"{k:3d} деревьев: точность {np.mean((p > 0.5) == y_te):.3f}, ECE {ece(y_te, p):.3f}, log-loss {ll:.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Точность может не заметить, что вероятности модели стали нечестными.</li>
+    <li>Калибровку проверяют диаграммой надёжности и ECE; log-loss чувствителен к самоуверенности.</li>
+    <li>Ранжирование, неопределённость и эксплуатация требуют своих потерь, метрик и процедур.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "В корзине 0.8–0.9 средний прогноз 0.85, а доля класса 1 — 0.60. Что это значит?", "options": ["модель недооценивает вероятность", "модель переоценивает вероятность (самоуверенна)", "всё в порядке"], "answer": 1, "explain": "Модель обещает 85%, а сбывается 60%."},
+    {"q": "Почему точность почти не изменилась, хотя вероятности испортились?", "options": ["точность зависит только от того, по какую сторону от 0.5 прогноз", "точность считается на обучении", "из-за маленького теста"], "answer": 0, "explain": "Прогноз 0.99 и 0.6 дают один и тот же класс."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

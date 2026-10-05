@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_3">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3. Ансамбли: сила многих слабых моделей</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем этот модуль</h2>
+  <p class="lead">Одно дерево — неустойчивая модель с большим разбросом или большим смещением. Ансамбль объединяет много деревьев и получает модель лучше любого из них.</p>
+  <p>Объединять можно двумя принципиально разными способами. Первый ведёт к случайному лесу, второй — к бустингу. Понять разницу — значит понять, почему у бустинга такие гиперпараметры и почему он часто точнее.</p>
+</section>
+
+<section id="crowd">
+  <h2>Мудрость толпы — и её условие</h2>
+  <p>Пусть $B$ моделей ошибаются независимо, каждая с разбросом $\sigma^2$. Среднее их прогнозов имеет разброс $\sigma^2 / B$ — в $B$ раз меньше! Но если ошибки моделей <strong>коррелированы</strong> с коэффициентом $\rho$, выигрыш ограничен:</p>
+  <div class="formula">$$\mathrm{Var}\Big(\frac1B \sum_{b=1}^{B} \hat F_b\Big) = \rho\, \sigma^2 + \frac{1-\rho}{B}\, \sigma^2 \;\xrightarrow{B\to\infty}\; \rho\,\sigma^2$$</div>
+  <p>Толпа мудра, только если её члены думают по-разному. Отсюда всё искусство параллельных ансамблей: сделать модели разнообразными (урок <a data-lesson="lesson_3_1"></a>).</p>
+</section>
+
+<section id="two">
+  <h2>Две стратегии</h2>
+  <div class="compare">
+    <div>
+      <h4>Параллельно: бэггинг, случайный лес</h4>
+      <p>Модели строятся <strong>независимо</strong> на случайных вариантах данных и <strong>усредняются</strong>.</p>
+      <ul><li>Базовая модель — глубокое дерево: малое смещение, большой разброс.</li><li>Усреднение уменьшает <strong>разброс</strong>.</li><li>Больше деревьев — не хуже (переобучения от числа деревьев нет).</li></ul>
+    </div>
+    <div>
+      <h4>Последовательно: бустинг</h4>
+      <p>Каждая модель строится <strong>с учётом ошибок предыдущих</strong>, прогнозы <strong>складываются</strong>.</p>
+      <ul><li>Базовая модель — неглубокое дерево: малый разброс, большое смещение.</li><li>Сложение шаг за шагом уменьшает <strong>смещение</strong>.</li><li>Слишком много деревьев — переобучение: нужны темп и ранняя остановка.</li></ul>
+    </div>
+  </div>
+  <p>Сравните вживую. Слева — среднее $B$ глубоких деревьев на бутстрэп-выборках, справа — бустинг из $B$ пней. Меняйте $B$:</p>
+  <div data-widget="bag-vs-boost"></div>
+</section>
+
+<section id="plan">
+  <h2>Модуль по косточкам</h2>
+  <div class="bones" data-title="От ансамблей к градиентному бустингу">
+    <details class="bone" open><summary data-go="lesson_3_1">Бэггинг и случайный лес</summary><div class="bone-body">
+      <p>Бутстрэп, усреднение, декорреляция через случайные признаки, оценка «вне мешка».</p>
+    </div></details>
+    <details class="bone"><summary data-go="lesson_3_2">AdaBoost — первый успешный бустинг</summary><div class="bone-body">
+      <p>Веса объектов растут там, где ансамбль ошибается; вес каждого ученика зависит от его точности.</p>
+    </div></details>
+    <details class="bone"><summary data-go="lesson_3_3">Аддитивные модели и пошаговое построение</summary><div class="bone-body">
+      <p>AdaBoost оказывается пошаговой минимизацией экспоненциальных потерь. Если заменить потери на любые — нужен градиент: так рождается градиентный бустинг.</p>
+    </div></details>
+  </div>
+  <div data-sublessons></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Лес против бустинга на одних данных">
+<pre><code class="language-python">from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from gbcourse import datasets
+from gbcourse.metrics import mse
+
+X, y = datasets.regression_1d(kind="wave", n=300, noise=0.4, seed=21)
+X_tr, X_te, y_tr, y_te = datasets.train_test_split(X, y, test_size=0.3, seed=0)
+for B in (1, 10, 100, 1000):
+    rf = RandomForestRegressor(n_estimators=B, random_state=0).fit(X_tr, y_tr)
+    gb = GradientBoostingRegressor(n_estimators=B, learning_rate=0.1, max_depth=1).fit(X_tr, y_tr)
+    print(f"B = {B:4d}: лес MSE {mse(y_te, rf.predict(X_te)):.3f},  бустинг MSE {mse(y_te, gb.predict(X_te)):.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Ансамбль работает, если ошибки моделей не слишком коррелированы.</li>
+    <li>Бэггинг/лес: независимые глубокие деревья, усреднение, борьба с разбросом.</li>
+    <li>Бустинг: последовательные неглубокие деревья, сложение, борьба со смещением.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Ошибки 100 моделей коррелированы с ρ = 0.5, у каждой разброс σ² = 1. Разброс их среднего?", "options": ["0.01", "≈ 0.505", "1"], "answer": 1, "explain": "ρσ² + (1 − ρ)σ²/B = 0.5 + 0.5/100 = 0.505."},
+    {"q": "Что произойдёт, если в случайном лесу увеличить число деревьев с 500 до 5000?", "options": ["Сильное переобучение", "Качество почти не изменится (может чуть улучшиться)", "Смещение резко упадёт"], "answer": 1, "explain": "Усреднение большего числа деревьев не переобучает — разброс лишь ещё немного уменьшается."},
+    {"q": "Какие деревья обычно используют в бустинге?", "options": ["Глубокие, без ограничений", "Неглубокие (слабые ученики)", "Только пни"], "answer": 1, "explain": "Бустинг убирает смещение, поэтому начинает с моделей с малым разбросом; глубина обычно 3–8."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

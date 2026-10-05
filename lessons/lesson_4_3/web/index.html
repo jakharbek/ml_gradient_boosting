@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_4_3">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>4.3 Градиентный бустинг с нуля на Python</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Пока алгоритм не написан своими руками, в нём остаются тёмные углы. В этом уроке мы соберём градиентный бустинг целиком — около 80 строк на numpy — и убедимся, что он совпадает с scikit-learn до погрешности округления.</p>
+  <p>Все ячейки ниже выполняются прямо в браузере и образуют одну программу: переменные из предыдущих ячеек доступны в следующих, как в Jupyter. Запускайте их по порядку (или сразу последнюю — предыдущие выполнятся сами).</p>
+</section>
+
+<section id="plan">
+  <h2>План сборки</h2>
+  <div class="bones" data-title="Реализация по косточкам">
+    <details class="bone" open><summary>1. Лучшее разбиение узла</summary><div class="bone-body"><p>Сортировка, накопленные суммы, выигрыш (урок <a data-lesson="lesson_2_1"></a>).</p></div></details>
+    <details class="bone"><summary>2. Дерево: рекурсия и прогноз</summary><div class="bone-body"><p>Узлы храним в плоских массивах — так прогноз быстрый и векторизуемый.</p></div></details>
+    <details class="bone"><summary>3. Бустинг: цикл по деревьям</summary><div class="bone-body"><p>$F_0$, остатки, дерево, шаг — алгоритм модуля <a data-lesson="lesson_4">4</a>.</p></div></details>
+    <details class="bone"><summary>4. Поэтапные прогнозы и история</summary><div class="bone-body"><p>Кривые обучения и валидации, выбор числа деревьев.</p></div></details>
+    <details class="bone"><summary>5. Подключаемая функция потерь</summary><div class="bone-body"><p>Заменяем «остаток» на «антиградиент» — и код готов к модулю <a data-lesson="lesson_5">5</a>.</p></div></details>
+  </div>
+</section>
+
+<section id="split">
+  <h2>1. Лучшее разбиение</h2>
+  <p>Функция получает матрицу признаков и цели узла и возвращает лучший признак, порог и выигрыш. Для каждого признака — один проход по отсортированным значениям.</p>
+  <div class="pycell" data-title="best_split">
+<pre><code class="language-python">import numpy as np
+
+def best_split(X, y, min_leaf=1):
+    """Лучшее разбиение узла по сумме квадратов: (признак, порог, выигрыш) или None."""
+    n, d = X.shape
+    if n < 2:
+        return None
+    S = y.sum()
+    best = None
+    for j in range(d):
+        order = np.argsort(X[:, j], kind="stable")
+        xs, ys = X[order, j], y[order]
+        SL = np.cumsum(ys)[:-1]                      # сумма слева при разрезе после k-го объекта
+        nL = np.arange(1, n)
+        gain = SL**2 / nL + (S - SL)**2 / (n - nL) - S**2 / n
+        bad = (xs[:-1] == xs[1:]) | (nL < min_leaf) | (n - nL < min_leaf)
+        gain[bad] = -np.inf
+        k = int(np.argmax(gain))
+        if gain[k] > 0 and (best is None or gain[k] > best[2]):
+            best = (j, (xs[k] + xs[k + 1]) / 2, gain[k])
+    return best
+
+X_toy = np.arange(1.0, 7.0).reshape(-1, 1)
+y_toy = np.array([2.0, 4, 3, 7, 9, 11])
+print(best_split(X_toy, y_toy - y_toy.mean()))     # ожидаем (0, 3.5, 54.0)</code></pre>
+  </div>
+</section>
+
+<section id="tree">
+  <h2>2. Дерево</h2>
+  <p>Узлы хранятся в массивах: признак, порог, левый и правый потомок, значение. У листа потомков нет (−1). Прогноз спускает сразу все объекты уровень за уровнем.</p>
+  <div class="pycell" data-title="class Tree">
+<pre><code class="language-python">class Tree:
+    def __init__(self, max_depth=3, min_leaf=1):
+        self.max_depth, self.min_leaf = max_depth, min_leaf
+
+    def fit(self, X, y):
+        self.feature, self.threshold, self.left, self.right, self.value = [], [], [], [], []
+        self._grow(X, y, depth=0)
+        self.feature, self.threshold = np.array(self.feature), np.array(self.threshold)
+        self.left, self.right, self.value = np.array(self.left), np.array(self.right), np.array(self.value)
+        return self
+
+    def _grow(self, X, y, depth):
+        node = len(self.value)
+        self.feature.append(-1); self.threshold.append(0.0)
+        self.left.append(-1); self.right.append(-1); self.value.append(y.mean())
+        if depth < self.max_depth and len(y) >= 2 * self.min_leaf:
+            split = best_split(X, y, self.min_leaf)
+            if split is not None:
+                j, t, _ = split
+                mask = X[:, j] <= t
+                self.feature[node], self.threshold[node] = j, t
+                self.left[node] = self._grow(X[mask], y[mask], depth + 1)
+                self.right[node] = self._grow(X[~mask], y[~mask], depth + 1)
+        return node
+
+    def predict(self, X):
+        idx = np.zeros(len(X), dtype=int)
+        while True:
+            internal = self.left[idx] >= 0
+            if not internal.any():
+                return self.value[idx]
+            rows = np.flatnonzero(internal)
+            node = idx[rows]
+            go_left = X[rows, self.feature[node]] <= self.threshold[node]
+            idx[rows] = np.where(go_left, self.left[node], self.right[node])
+
+from sklearn.tree import DecisionTreeRegressor
+from gbcourse import datasets
+X, y = datasets.friedman1(n=500, noise=1.0, seed=43)
+t = Tree(max_depth=4).fit(X, y)
+sk = DecisionTreeRegressor(max_depth=4).fit(X, y)
+print("листьев:", int((t.left < 0).sum()), " расхождение с sklearn:", np.abs(t.predict(X) - sk.predict(X)).max())</code></pre>
+  </div>
+</section>
+
+<section id="gbm">
+  <h2>3–4. Бустинг с историей и поэтапными прогнозами</h2>
+  <div class="pycell" data-title="class GradientBoosting">
+<pre><code class="language-python">class GradientBoosting:
+    def __init__(self, n_estimators=100, learning_rate=0.1, max_depth=3, min_leaf=1):
+        self.M, self.nu = n_estimators, learning_rate
+        self.max_depth, self.min_leaf = max_depth, min_leaf
+
+    def fit(self, X, y, eval_set=None):
+        self.f0 = y.mean()                                  # 1. стартовая константа
+        F = np.full(len(y), self.f0)
+        self.trees, self.history = [], {"train": [np.mean((y - F)**2)], "eval": []}
+        if eval_set is not None:
+            Xv, yv = eval_set
+            Fv = np.full(len(yv), self.f0)
+            self.history["eval"].append(np.mean((yv - Fv)**2))
+        for m in range(self.M):
+            r = y - F                                       # 2. остатки
+            tree = Tree(self.max_depth, self.min_leaf).fit(X, r)   # 3. дерево на остатках
+            F += self.nu * tree.predict(X)                  # 4. шаг
+            self.trees.append(tree)
+            self.history["train"].append(np.mean((y - F)**2))
+            if eval_set is not None:
+                Fv += self.nu * tree.predict(Xv)
+                self.history["eval"].append(np.mean((yv - Fv)**2))
+        return self
+
+    def staged_predict(self, X):
+        F = np.full(len(X), self.f0)
+        yield F.copy()
+        for tree in self.trees:
+            F += self.nu * tree.predict(X)
+            yield F.copy()
+
+    def predict(self, X, n_trees=None):
+        F = np.full(len(X), self.f0)
+        for tree in self.trees[:n_trees]:
+            F += self.nu * tree.predict(X)
+        return F
+
+from sklearn.ensemble import GradientBoostingRegressor
+X_tr, X_val, y_tr, y_val = datasets.train_test_split(X, y, test_size=0.3, seed=0)
+ours = GradientBoosting(n_estimators=300, learning_rate=0.1, max_depth=3).fit(X_tr, y_tr, eval_set=(X_val, y_val))
+sk = GradientBoostingRegressor(n_estimators=300, learning_rate=0.1, max_depth=3).fit(X_tr, y_tr)
+print("расхождение с sklearn на обучении:", np.abs(ours.predict(X_tr) - sk.predict(X_tr)).max())
+print("MSE на валидации: наша", np.mean((y_val - ours.predict(X_val))**2), " sklearn", np.mean((y_val - sk.predict(X_val))**2))
+best = int(np.argmin(ours.history["eval"]))
+print(f"лучшее число деревьев по валидации: {best}, MSE {ours.history['eval'][best]:.3f}")</code></pre>
+  </div>
+  <div class="callout note"><p>Почему сравниваем на обучении? Там модели совпадают до погрешности округления. На новых точках возможны небольшие отличия из-за <strong>ничьих</strong>: в маленьком узле несколько признаков могут делить обучающие объекты одинаково, и реализации выбирают разные признаки (scikit-learn перебирает их в случайном порядке). На обучении такие деревья неразличимы, качество на новых данных — одинаковое.</p></div>
+  <div class="pycell" data-title="Кривые обучения нашей модели">
+<pre><code class="language-python">import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(7, 3.6))
+ax.plot(ours.history["train"], label="обучение")
+ax.plot(ours.history["eval"], label="валидация")
+ax.axvline(best, color="#898781", ls="--", lw=1)
+ax.set(xlabel="число деревьев", ylabel="MSE", yscale="log")
+ax.legend()
+plt.show()</code></pre>
+  </div>
+</section>
+
+<section id="loss">
+  <h2>5. Подключаемая функция потерь</h2>
+  <p>Единственное место, где в коде «спрятаны» квадратичные потери, — строки <code>F0 = mean(y)</code>, <code>r = y - F</code> и значение листа <code>mean</code>. Вынесем их в объект потерь. Остаток превращается в <strong>антиградиент</strong>, а значение листа — в <strong>оптимальную константу для потерь</strong>. Этот шаг и есть переход к общему градиентному бустингу — ровно то, что формально разбирает модуль <a data-lesson="lesson_5">5</a>.</p>
+  <div class="pycell" data-title="Потери как объект: L2 и L1">
+<pre><code class="language-python">class SquaredLoss:
+    init = staticmethod(np.mean)                                  # лучшая константа
+    negative_gradient = staticmethod(lambda y, F: y - F)          # антиградиент = остаток
+    leaf_value = staticmethod(lambda y, F: np.mean(y - F))        # лучшая добавка в лист
+
+class AbsoluteLoss:
+    init = staticmethod(np.median)
+    negative_gradient = staticmethod(lambda y, F: np.sign(y - F)) # знак ошибки
+    leaf_value = staticmethod(lambda y, F: np.median(y - F))      # медиана остатков листа
+
+def boost(X, y, loss, M=200, nu=0.1, depth=3):
+    f0 = loss.init(y)
+    F = np.full(len(y), f0)
+    trees = []
+    for m in range(M):
+        tree = Tree(depth).fit(X, loss.negative_gradient(y, F))   # дерево на антиградиенте
+        leaf = tree.predict(X)                                    # чтобы узнать, кто в каком листе
+        for v in np.unique(leaf):                                 # пересчитать значения листьев
+            in_leaf = leaf == v
+            tree.value[tree.value == v] = loss.leaf_value(y[in_leaf], F[in_leaf])
+        F += nu * tree.predict(X)
+        trees.append(tree)
+    return f0, trees
+
+for loss in (SquaredLoss, AbsoluteLoss):
+    f0, trees = boost(X_tr, y_tr, loss)
+    pred = f0 + 0.1 * sum(t.predict(X_val) for t in trees)
+    print(f"{loss.__name__:13s} MAE на валидации {np.mean(np.abs(y_val - pred)):.3f}")</code></pre>
+  </div>
+  <div class="callout warning"><p>Пересчёт листьев выше сделан упрощённо: листья ищутся по совпадению значений, а это ломается, если у двух листьев одинаковое значение. В <code>gbcourse</code> дерево хранит индексы объектов каждого листа — см. метод <code>_line_search</code> в <code>shared/python/gbcourse/boosting.py</code>.</p></div>
+</section>
+
+<section id="read">
+  <h2>Как читать код gbcourse</h2>
+  <table>
+    <thead><tr><th>Что</th><th>Где</th></tr></thead>
+    <tbody>
+      <tr><td>Цикл бустинга, подвыборки, история, ранняя остановка</td><td><code>shared/python/gbcourse/boosting.py → GradientBoosting.fit</code></td></tr>
+      <tr><td>Пересчёт листьев под потери (линейный поиск Фридмана)</td><td><code>boosting.py → _line_search</code></td></tr>
+      <tr><td>Дерево по градиентам и гессианам</td><td><code>tree.py → RegressionTree</code></td></tr>
+      <tr><td>Функции потерь: init, градиент, гессиан, значение листа</td><td><code>losses.py</code></td></tr>
+      <tr><td>То же на JavaScript (виджеты курса)</td><td><code>shared/web/js/engine/*.js</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Бустинг — это ~80 строк: разбиение, дерево, цикл с остатками и шагом.</li>
+    <li>Наша реализация совпадает с scikit-learn до погрешности округления.</li>
+    <li>Квадратичные потери спрятаны в трёх местах; вынеся их в объект, получаем общий алгоритм.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Какие три места кода нужно изменить, чтобы бустинг работал с другой функцией потерь?", "options": ["стартовая константа, то, на чём учится дерево (антиградиент), значения листьев", "глубину, темп и число деревьев", "только функцию predict"], "answer": 0, "explain": "Именно их мы вынесли в объект потерь."},
+    {"q": "Зачем хранить дерево в плоских массивах?", "options": ["Чтобы прогноз можно было векторизовать по всем объектам сразу", "Так требует numpy", "Чтобы дерево было глубже"], "answer": 0, "explain": "Все объекты спускаются по уровням одновременно — это быстро."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

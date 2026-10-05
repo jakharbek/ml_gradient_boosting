@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_10_3">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>10.3 Свои функции потерь и метрики</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Магазин прогнозирует спрос. Недопрогноз — пустая полка и потерянные продажи, перепрогноз — лишний товар на складе. Если недопрогноз вдвое-втрое дороже, минимизировать симметричную MSE — значит решать не ту задачу. Бустинг второго порядка позволяет обучаться на любой дважды дифференцируемой потере: достаточно дать ему $g$ и $h$ (урок <a data-lesson="lesson_8_1"></a>).</p>
+</section>
+
+<section id="loss">
+  <h2>Асимметричная квадратичная потеря</h2>
+  <p>Пусть $r = y - F$ — остаток; $r &gt; 0$ означает недопрогноз. Штрафуем его в α раз сильнее:</p>
+  <div class="formula">$$L(y, F) = \begin{cases} \frac{\alpha}{2} r^2, & r &gt; 0 \\ \frac12 r^2, & r \le 0 \end{cases} \qquad g = \frac{\partial L}{\partial F} = \begin{cases} -\alpha r \\ -r \end{cases} \qquad h = \begin{cases} \alpha \\ 1 \end{cases}$$</div>
+  <p>Лучшая константа для такой потери — не среднее и не квантиль, а <b>экспектиль</b> уровня $\tau = \frac{\alpha}{1+\alpha}$. При α = 1 это обычное среднее. У потери $h &gt; 0$ везде, так что формулы второго порядка работают без оговорок.</p>
+  <div data-widget="asymmetric"></div>
+</section>
+
+<section id="api">
+  <h2>Как передать библиотеке</h2>
+  <div class="bones" data-title="Своя цель и своя метрика по косточкам">
+    <details class="bone" open><summary>XGBoost</summary><div class="bone-body"><p>Нативный интерфейс: <code>xgb.train(params, dtrain, obj=f)</code>, где <code>f(preds, dtrain)</code> возвращает массивы <code>grad</code> и <code>hess</code>; <code>preds</code> — сырые прогнозы $F$. В sklearn-обёртке — <code>objective=f(y_true, y_pred)</code>. Проверка в ноутбуке: своя псевдо-Хьюбер-цель дала прогнозы, совпадающие со встроенной <code>reg:pseudohubererror</code> до нуля.</p></div></details>
+    <details class="bone"><summary>LightGBM</summary><div class="bone-body"><p><code>LGBMRegressor(objective=f)</code>, <code>f(y_true, y_pred) → (grad, hess)</code>. Своя метрика — <code>eval_metric=m</code>, <code>m(y_true, y_pred) → (имя, значение, больше_лучше)</code>; по ней работает ранняя остановка.</p></div></details>
+    <details class="bone"><summary>Проверяйте g и h численно</summary><div class="bone-body"><p>Ошибка в знаке градиента — самая частая: модель «учится» в обратную сторону. Сравните свои $g$, $h$ с конечными разностями, как в уроке <a data-lesson="lesson_8_1"></a>.</p></div></details>
+  </div>
+</section>
+
+<section id="pitfalls">
+  <h2>Четыре грабли</h2>
+  <div class="bones" data-title="Ловушки по косточкам">
+    <details class="bone" open><summary>1. Старт LightGBM со своей целью — с нуля</summary><div class="bone-body"><p>Со встроенной целью LightGBM начинает с лучшей константы (среднего), а со своей — с $F_0 = 0$. На задаче Фридмана ($\bar y \approx 14$) своя L2-цель после 10 деревьев дала MSE 30.9 против 6.6 у встроенной; к 100 деревьям разница исчезла. Лечение — <code>init_score</code> в <code>fit</code>.</p></div></details>
+    <details class="bone"><summary>2. init_score не входит в predict</summary><div class="bone-body"><p>С <code>init_score = ȳ</code> деревья совпали со встроенной целью точно, но <code>predict()</code> возвращает только сумму деревьев. Стартовое значение нужно прибавить самому.</p></div></details>
+    <details class="bone"><summary>3. base_score в XGBoost — сырое значение</summary><div class="bone-body"><p>Со своей целью <code>base_score</code> — это стартовый $F_0$, а у встроенной <code>binary:logistic</code> — вероятность (урок <a data-lesson="lesson_8_1"></a>). Для своей цели ставьте разумный $F_0$ явно, например лучшую константу вашей потери.</p></div></details>
+    <details class="bone"><summary>4. Встроенная метрика LightGBM никуда не девается</summary><div class="bone-body"><p>Со своей целью LightGBM всё равно считает L2 на валидации, и ранняя остановка по умолчанию смотрит на первую метрику — на неё, а не на вашу. Передавайте <code>metric="None"</code>. В упражнении 2 так остановка по доле недопрогнозов дала 75 деревьев, по асимметричной цене — 87. Без <code>metric="None"</code> обе остановились на одном и том же 41-м дереве. В XGBoost встроенную метрику отключает <code>disable_default_eval_metric</code>. Ещё одна мелочь: LightGBM смотрит на число аргументов вашей функции и третьим передаёт веса объектов, поэтому параметры потери передавайте через замыкание, а не через аргумент по умолчанию.</p></div></details>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Асимметричная потеря в LightGBM со своей метрикой">
+<pre><code class="language-python">import numpy as np
+import lightgbm as lgb
+from gbcourse import datasets
+
+ALPHA = 5.0
+def asym_obj(y_true, y_pred):
+    r = y_true - y_pred
+    return np.where(r > 0, -ALPHA * r, -r), np.where(r > 0, ALPHA, 1.0)
+
+def asym_cost(y_true, y_pred):
+    r = y_true - y_pred
+    return "асим. цена", float(np.mean(np.where(r > 0, ALPHA, 1.0) * r * r / 2)), False
+
+X, y = datasets.regression_1d(kind="hetero", n=2000, noise=0.5, seed=161)
+X_tr, X_te, y_tr, y_te = datasets.train_test_split(X, y, test_size=0.3, seed=0)  # данные упорядочены по x
+F0 = np.full(len(y_tr), y_tr.mean())
+for name, obj in (("L2", "regression"), ("асимметричная", asym_obj)):
+    m = lgb.LGBMRegressor(n_estimators=200, learning_rate=0.05, num_leaves=8, objective=obj, verbose=-1)
+    m.fit(X_tr, y_tr, init_score=F0 if callable(obj) else None)
+    pred = m.predict(X_te) + (y_tr.mean() if callable(obj) else 0.0)  # init_score не входит в predict!
+    print(f"{name:14s} асимметричная цена {asym_cost(y_te, pred)[1]:.3f}, доля недопрогнозов {np.mean(y_te > pred):.2f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Своя цель = две функции $g$ и $h$; при $h &gt; 0$ бустинг второго порядка работает как со встроенной.</li>
+    <li>Своя метрика нужна, чтобы ранняя остановка следила за тем, что важно для задачи.</li>
+    <li>Задавайте стартовое значение явно: LightGBM со своей целью начинает с нуля, а <code>init_score</code> не входит в <code>predict</code>.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "α = 5, объект недопрогнозирован на r = 2. Чему равны g и h?", "options": ["g = −10, h = 5", "g = 10, h = 5", "g = −2, h = 1"], "answer": 0, "explain": "При r > 0: g = −αr = −10, h = α = 5. Отрицательный градиент — прогноз нужно увеличить."},
+    {"q": "LightGBM со своей целью и init_score = ȳ. Что вернёт predict?", "options": ["прогноз с учётом ȳ", "только сумму деревьев — ȳ нужно прибавить", "ȳ"], "answer": 1, "explain": "init_score используется при обучении, но не сохраняется в модели."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

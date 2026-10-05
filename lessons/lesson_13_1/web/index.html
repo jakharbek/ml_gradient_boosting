@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_13_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>13.1 Ранжирование: LambdaMART</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Поиск, рекомендации, лента новостей: пользователь видит первые несколько результатов, и важен только их <b>порядок</b>. Ошибиться с десятым документом почти не страшно, с первым — очень. Обычная регрессия этого не знает. LambdaMART — бустинг, который учится именно порядку. Долгие годы он был стандартом промышленного поиска.</p>
+</section>
+
+<section id="setup">
+  <h2>Постановка и метрика</h2>
+  <p>Данные разбиты на <b>запросы</b>. У каждого запроса — список документов с признаками $x$ и оценкой релевантности $\mathrm{rel} \in \{0, 1, 2, 3, 4\}$. Модель выдаёт число $s(x)$, документы сортируются по убыванию $s$.</p>
+  <div class="formula">$$\mathrm{DCG@k} = \sum_{i=1}^{k} \frac{2^{\mathrm{rel}_i} - 1}{\log_2(i + 1)}, \qquad \mathrm{NDCG@k} = \frac{\mathrm{DCG@k}}{\mathrm{DCG@k}_{\text{идеальный}}} \in [0, 1].$$</div>
+  <p>Числитель поощряет высокую релевантность (экспоненциально), знаменатель $\log_2(i+1)$ снижает вес позиций внизу списка. Нормировка на идеальный порядок делает метрику сравнимой между запросами.</p>
+</section>
+
+<section id="approaches">
+  <h2>Три подхода</h2>
+  <div class="bones" data-title="Обучение ранжированию по косточкам">
+    <details class="bone" open><summary>Поточечный: регрессия на оценки</summary><div class="bone-body"><p>Предсказываем $\mathrm{rel}$ как число. Просто, но потери одинаковы для ошибки на первой и на сотой позиции, и сравнивать документы разных запросов модель учится зря.</p></div></details>
+    <details class="bone"><summary>Попарный: RankNet</summary><div class="bone-body"><p>Для пары документов одного запроса с $\mathrm{rel}_i &gt; \mathrm{rel}_j$ модель должна дать $s_i &gt; s_j$. Вероятность правильного порядка $\sigma(s_i - s_j)$, потеря — log-loss: $\log\big(1 + e^{-(s_i - s_j)}\big)$. Градиент по $s_i$: $-\rho_{ij}$, где $\rho_{ij} = \frac{1}{1 + e^{s_i - s_j}}$ — вероятность неправильного порядка.</p></div></details>
+    <details class="bone"><summary>LambdaRank: вес — изменение NDCG</summary><div class="bone-body"><p>Попарная потеря не знает про позиции. LambdaRank (Бёрджес и др., 2006) умножает градиент пары на $|\Delta\mathrm{NDCG}_{ij}|$ — насколько изменилась бы метрика, если поменять $i$ и $j$ местами: $\lambda_{ij} = -\rho_{ij}\,|\Delta\mathrm{NDCG}_{ij}|$. Суммарная «лямбда» документа — сила, с которой его надо тянуть вверх или вниз. Ошибки в верхней части списка получают большие лямбды.</p></div></details>
+    <details class="bone"><summary>LambdaMART = бустинг по лямбдам</summary><div class="bone-body"><p>MART (Multiple Additive Regression Trees) — это градиентный бустинг. Каждое дерево строится по парам $(g_i, h_i)$, где $g_i$ — сумма лямбд документа, $h_i$ — сумма $\rho_{ij}(1-\rho_{ij})|\Delta\mathrm{NDCG}_{ij}|$. Дальше всё как в модуле <a data-lesson="lesson_8"></a>. Реализация — 40 строк (пример урока).</p></div></details>
+  </div>
+  <div data-widget="lambda-toy"></div>
+</section>
+
+<section id="results">
+  <h2>Сравнение</h2>
+  <p>Синтетические запросы (150 для обучения, 150 для теста, 10–30 документов в каждом), скрытая полезность $u = x_0 + 2x_1x_2 - 0.5x_3^2 + \varepsilon$, оценки 0…4 — квантили $u$ внутри запроса. 100 деревьев (пример <code>examples/lambdamart.py</code>).</p>
+  <table>
+    <thead><tr><th>Модель</th><th>NDCG@10 на тесте</th></tr></thead>
+    <tbody>
+      <tr><td>случайный порядок</td><td class="num">0.507</td></tr>
+      <tr><td>попарно без веса ΔNDCG (RankNet)</td><td class="num">0.866</td></tr>
+      <tr><td>регрессия на оценки (поточечно)</td><td class="num">0.886</td></tr>
+      <tr><td>LambdaMART своими руками</td><td class="num">0.889</td></tr>
+      <tr><td>XGBoost <code>rank:ndcg</code></td><td class="num">0.891</td></tr>
+      <tr><td>LightGBM <code>lambdarank</code></td><td class="num">0.901</td></tr>
+    </tbody>
+  </table>
+  <p>Вес $|\Delta\mathrm{NDCG}|$ заметно улучшил попарный подход (0.866 → 0.889). Но на этих данных простая регрессия на оценки почти не уступила LambdaMART. Так бывает, когда оценки хорошо отражают полезность, а запросы похожи друг на друга. Преимущество списочных методов растёт, когда важен верх списка, а запросы сильно различаются. Проверяйте на своих данных.</p>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <p>В LightGBM запросы задаются размерами групп (строки одного запроса идут подряд), в XGBoost — номером запроса у каждой строки. Код для Jupyter; полный вариант — в примере урока.</p>
+<pre><code class="language-python">import numpy as np, lightgbm as lgb, xgboost as xgb
+
+group = np.bincount(qid)                    # число документов в каждом запросе (строки упорядочены по qid)
+ranker = lgb.LGBMRanker(n_estimators=100, learning_rate=0.1, num_leaves=16)
+ranker.fit(X, rel, group=group)
+scores = ranker.predict(X_test)             # сортируйте документы запроса по убыванию
+
+xr = xgb.XGBRanker(n_estimators=100, learning_rate=0.1, max_depth=4, objective="rank:ndcg")
+xr.fit(X, rel, qid=qid)</code></pre>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Ранжирование оценивают NDCG@k: важны верхние позиции и высокая релевантность.</li>
+    <li>LambdaRank взвешивает попарные градиенты изменением NDCG; LambdaMART строит по ним деревья второго порядка.</li>
+    <li>Сравнивайте с простой регрессией на оценки: она бывает неожиданно сильной.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Документ с rel = 3 на первой позиции. Его вклад в DCG?", "options": ["3", "7", "7 / log₂3"], "answer": 1, "explain": "(2³ − 1)/log₂(2) = 7/1 = 7."},
+    {"q": "Почему у LambdaRank ошибка в верхней части списка получает большую лямбду?", "options": ["из-за экспоненты в gain и большего веса верхних позиций в |ΔNDCG|", "из-за маленького темпа", "так устроен RankNet"], "answer": 0, "explain": "Перестановка в верху списка сильнее меняет NDCG."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

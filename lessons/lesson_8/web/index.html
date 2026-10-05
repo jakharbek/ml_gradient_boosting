@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_8">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>8. XGBoost изнутри: бустинг второго порядка</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем этот модуль</h2>
+  <p class="lead">XGBoost (Чен и Гестрин, 2016) не изобрёл бустинг заново. Он аккуратно собрал его вокруг <b>одной</b> целевой функции: потери + штраф за сложность деревьев. Её квадратичное приближение сразу даёт и значения листьев, и критерий выбора разбиений. К этому добавлена инженерия, которая делает обучение быстрым на миллионах строк.</p>
+</section>
+
+<section id="compare">
+  <h2>Классический GBM против XGBoost</h2>
+  <table>
+    <thead><tr><th></th><th>GBM Фридмана (урок <a data-lesson="lesson_5_2"></a>)</th><th>XGBoost</th></tr></thead>
+    <tbody>
+      <tr><td>Что видит дерево</td><td>псевдо-остатки $r_i = -g_i$</td><td>пары $(g_i, h_i)$: градиент и гессиан</td></tr>
+      <tr><td>Как выбирается разбиение</td><td>уменьшение MSE по остаткам</td><td>выигрыш цели: $\frac12\big[\frac{G_L^2}{H_L+\lambda} + \frac{G_R^2}{H_R+\lambda} - \frac{G^2}{H+\lambda}\big] - \gamma$</td></tr>
+      <tr><td>Значение листа</td><td>линейный поиск отдельно в каждом листе</td><td>$w = -G/(H + \lambda)$ — готовая формула</td></tr>
+      <tr><td>Регуляризация</td><td>снаружи: глубина, темп, подвыборки</td><td>ещё и внутри цели: λ, α, γ</td></tr>
+      <tr><td>Новая функция потерь</td><td>нужен свой линейный поиск</td><td>достаточно двух функций: $g$ и $h$</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="step">
+  <h2>Один шаг XGBoost</h2>
+  <p>Квадратичное приближение потерь объекта $g_i w + \frac12 h_i w^2$ — это, с точностью до константы, $\frac12 h_i\,(w - z_i)^2$, где $z_i = -g_i/h_i$. Значит, дерево второго порядка — это <b>взвешенная регрессия</b> на «рабочий отклик» $z_i$ с весами $h_i$. Именно так в 2000 году строил деревья LogitBoost (Фридман, Хасти, Тибширани).</p>
+  <div data-widget="xgb-step"></div>
+  <p>У объектов, в которых модель уверена, вес $h_i = p_i(1-p_i)$ почти ноль. Если такой объект ещё и классифицирован неверно, его $z_i$ огромен. Но в лист он входит произведением $h_i z_i = -g_i$, а для log-loss $|g_i| \le 1$. Поэтому его вклад в $w$ ограничен и не больше, чем у любого другого объекта с большой ошибкой. Опасен лист, который <b>целиком</b> состоит из уверенных объектов: там $H$ мало и $w = -G/H$ огромно. Штраф λ добавляет в знаменатель «фиктивный вес» и не даёт такому листу улететь.</p>
+</section>
+
+<section id="honest">
+  <h2>Что второй порядок даёт и чего не даёт</h2>
+  <div class="callout note"><p>Мы сравнили режимы <code>friedman</code> и <code>newton</code> в <code>gbcourse</code> на трёх двумерных задачах (глубина 2 и 4, 100 деревьев, ν = 0.3, среднее по трём разбиениям; код — в ноутбуке урока). Лучший log-loss на валидации различался меньше чем на 0.013: например, 0.262 против 0.254 на «лунах» при глубине 2. В одних случаях лучше один режим, в других — другой. Главные выгоды XGBoost не в точности отдельного шага, а в цельности (одна формула для разбиений и листьев, штрафы внутри цели, любая дважды дифференцируемая потеря) и в скорости.</p></div>
+</section>
+
+<section id="map">
+  <h2>Карта модуля</h2>
+  <div class="bones" data-title="XGBoost по косточкам">
+    <details class="bone" open><summary data-go="lesson_8_1">Разложение Тейлора: g и h</summary><div class="bone-body"><p>Потери вокруг текущего прогноза заменяются параболой $L \approx L_0 + g w + \frac12 h w^2$. Точность этой замены и что делать, когда $h = 0$.</p></div></details>
+    <details class="bone"><summary data-go="lesson_8_2">Регуляризованная цель: вес листа и выигрыш</summary><div class="bone-body"><p>Минимизация параболы в каждом листе даёт $w^*$, подстановка $w^*$ — «качество структуры» дерева, разность качеств — выигрыш разбиения.</p></div></details>
+    <details class="bone"><summary data-go="lesson_8_3">Поиск разбиений</summary><div class="bone-body"><p>Точный перебор по отсортированным значениям, гистограммы по квантилям, пропуски с направлением по умолчанию.</p></div></details>
+  </div>
+  <div data-sublessons></div>
+</section>
+
+<section id="code">
+  <h2>В коде: наш алгоритм совпадает с XGBoost</h2>
+  <p>Режим <code>mode="newton"</code> в <code>gbcourse</code> — это алгоритм XGBoost с точным поиском разбиений. На одних и тех же данных и параметрах прогнозы на обучающей выборке совпадают до точности float32, в которой считает XGBoost. (На новых данных возможны отличия из-за разбиений с равным выигрышем — об этом в уроке <a data-lesson="lesson_9_1"></a>.)</p>
+  <div class="pycell" data-title="gbcourse (newton) против xgboost (exact)">
+<pre><code class="language-python">import numpy as np
+import xgboost as xgb
+from gbcourse import datasets, GBClassifier
+
+X, y = datasets.classification_2d(kind="moons", n=300, noise=0.3, seed=81)
+params = dict(n_estimators=20, learning_rate=0.3, max_depth=3, reg_lambda=1.0, min_child_weight=1.0)
+
+ours = GBClassifier(mode="newton", **params).fit(X, y)
+ref = xgb.XGBClassifier(tree_method="exact", base_score=float(y.mean()), **params).fit(X, y)
+
+diff = np.abs(ours.predict_proba(X)[:, 1] - ref.predict_proba(X)[:, 1]).max()
+print(f"наибольшее расхождение вероятностей: {diff:.1e}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>XGBoost — это градиентный бустинг, в котором дерево строится по парам $(g_i, h_i)$, а штрафы входят в саму цель.</li>
+    <li>Дерево второго порядка — взвешенная регрессия на $z_i = -g_i/h_i$ с весами $h_i$.</li>
+    <li>Выигрыш по точности от второго порядка обычно невелик; главное — единая цель, штрафы и скорость.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Что нужно задать XGBoost, чтобы обучаться с новой функцией потерь?", "options": ["только значение потерь", "градиент g и гессиан h по прогнозу", "функцию линейного поиска для листьев"], "answer": 1, "explain": "Всё остальное (веса листьев, выигрыш) выражается через суммы G и H."},
+    {"q": "Log-loss, объект с p = 0.99 и y = 0. Что верно?", "options": ["его рабочий отклик z большой по модулю, а вес h маленький", "его вес h самый большой", "его градиент равен нулю"], "answer": 0, "explain": "g = p − y = 0.99, h = p(1 − p) ≈ 0.0099, z = −g/h ≈ −100, но вес h почти нулевой."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

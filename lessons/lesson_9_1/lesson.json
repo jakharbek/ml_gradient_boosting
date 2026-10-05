@@ -1,0 +1,25 @@
+{
+  "id": "lesson_9_1",
+  "title": "XGBoost на практике",
+  "short": "XGBoost",
+  "subtitle": "Два интерфейса, ранняя остановка, метрики, пять видов важности признаков, категории и сохранение модели",
+  "summary": "Практическая работа с XGBoost: sklearn-обёртка и нативный xgb.train с DMatrix; ранняя остановка и best_iteration; метрики качества; важности weight / gain / cover и почему частота разбиений вводит в заблуждение; категориальные признаки; сохранение и загрузка.",
+  "level": 3,
+  "duration": 40,
+  "prerequisites": ["lesson_9", "lesson_8_2"],
+  "objectives": [
+    "обучать XGBoost через оба интерфейса и с ранней остановкой",
+    "различать виды важности признаков и выбирать подходящий",
+    "сохранять модель и воспроизводимо загружать её"
+  ],
+  "keywords": ["XGBRegressor", "DMatrix", "xgb.train", "early_stopping_rounds", "best_iteration", "get_score", "importance_type", "enable_categorical"],
+  "datasets": [
+    {
+      "file": "data/friedman1_1000.csv",
+      "generator": "friedman1",
+      "params": {"n": 1000, "noise": 1.0, "seed": 92},
+      "title": "Задача Фридмана, 1000 объектов",
+      "description": "Пять информативных признаков x0–x4 и пять шумовых x5–x9."
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_7_3">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>7.3 Сложность деревьев и штрафы на листья</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Дерево можно сдерживать двумя способами: запретить ему расти (ограничения структуры) или сделать рост «дорогим» (штрафы). Второй способ — фирменная черта XGBoost и LightGBM, и он опирается на значения листьев второго порядка из урока <a data-lesson="lesson_6_2"></a>.</p>
+</section>
+
+<section id="structure">
+  <h2>Ограничения структуры</h2>
+  <table>
+    <thead><tr><th>Параметр</th><th>Что ограничивает</th><th>XGBoost / LightGBM / CatBoost</th></tr></thead>
+    <tbody>
+      <tr><td>Глубина</td><td>порядок взаимодействий, число листьев ≤ $2^d$</td><td><code>max_depth</code> / <code>max_depth</code> / <code>depth</code></td></tr>
+      <tr><td>Число листьев</td><td>прямо размер дерева</td><td><code>max_leaves</code> / <code>num_leaves</code> / <code>max_leaves</code></td></tr>
+      <tr><td>Объектов в листе</td><td>листья по 1–2 объекта</td><td>— / <code>min_child_samples</code> / <code>min_data_in_leaf</code></td></tr>
+      <tr><td>Сумма гессианов в листе</td><td>«уверенные» листья с малым $H$</td><td><code>min_child_weight</code> / <code>min_child_weight</code> / —</td></tr>
+    </tbody>
+  </table>
+  <div class="callout note"><p><code>min_child_weight</code> — это минимум $H = \sum h_i$ в листе. Для L2 $h_i = 1$, и это просто минимум объектов. Для log-loss $h_i = p_i(1-p_i)$: лист из сотни объектов, где модель уже уверена ($p \approx 0.99$), имеет $H \approx 1$ — его разбиение запретит <code>min_child_weight=2</code>.</p></div>
+</section>
+
+<section id="penalties">
+  <h2>Штрафы на листья</h2>
+  <p>XGBoost добавляет к потерям штраф за сложность каждого дерева:</p>
+  <div class="formula">$$\Omega(h) = \gamma T + \frac{\lambda}{2}\sum_{j=1}^{T} w_j^2 + \alpha \sum_{j=1}^{T} |w_j|$$</div>
+  <p>Здесь $T$ — число листьев, $w_j$ — их значения. Отсюда (урок <a data-lesson="lesson_8_2"></a>) получаются формулы значения листа и выигрыша разбиения:</p>
+  <div class="formula">$$w_j^* = -\frac{T_\alpha(G_j)}{H_j + \lambda}, \qquad \text{gain} = \frac12\left[\frac{T_\alpha(G_L)^2}{H_L+\lambda} + \frac{T_\alpha(G_R)^2}{H_R+\lambda} - \frac{T_\alpha(G)^2}{H + \lambda}\right] - \gamma$$</div>
+  <p>где $T_\alpha(G) = \operatorname{sign}(G)\max(|G| - \alpha, 0)$ — «мягкий порог».</p>
+  <div data-widget="lambda-shrink"></div>
+  <div class="bones" data-title="Три штрафа по косточкам">
+    <details class="bone" open><summary>λ (<code>reg_lambda</code>, L2): сжатие к нулю</summary><div class="bone-body"><p>Лист со средним псевдо-остатком $\bar r$ и $n$ объектами (L2): $w = \frac{n\bar r}{n + \lambda}$. Большие листья почти не меняются, маленькие сжимаются сильно — как «добавить λ фиктивных объектов с остатком 0». В XGBoost по умолчанию λ = 1.</p></div></details>
+    <details class="bone"><summary>α (<code>reg_alpha</code>, L1): обнуление слабых листьев</summary><div class="bone-body"><p>Если $|G| \le \alpha$, вес листа ровно ноль: лист с небольшой суммарной «тягой» ничего не меняет.</p></div></details>
+    <details class="bone"><summary>γ (<code>gamma</code>, <code>min_split_gain</code>): цена листа</summary><div class="bone-body"><p>Разбиение делается, только если выигрыш больше γ. Две тонкости реализации:</p>
+      <ul>
+        <li><b>Масштаб.</b> В статье XGBoost и в <code>gbcourse</code> выигрыш записан с множителем ½ (формула выше). Сами библиотеки XGBoost и LightGBM считают его без ½ и с этим удвоенным числом сравнивают <code>gamma</code> / <code>min_split_gain</code>. Поэтому γ = 5 в <code>gbcourse</code> соответствует <code>gamma=10</code> в XGBoost — проверено в ноутбуке урока <a data-lesson="lesson_8_2"></a>.</li>
+        <li><b>Когда отсекать.</b> <code>gbcourse</code> и LightGBM отказываются от слабого разбиения сразу. XGBoost сначала растит дерево до <code>max_depth</code>, а потом снизу вверх срезает разбиения с выигрышем меньше γ. Слабое разбиение, за которым идут сильные, XGBoost сохранит.</li>
+      </ul></div></details>
+  </div>
+</section>
+
+<section id="effect">
+  <h2>Эффект на модели</h2>
+  <div data-widget="penalty-effect"></div>
+  <p>Без штрафов модель с ν = 0.3 переобучается: ½MSE на новых данных 0.301 при почти нулевой ошибке обучения. Любой из трёх штрафов это исправляет: λ = 10 → 0.233, γ = 0.2 → 0.215, min_child_weight = 10 → 0.230. Заметьте, насколько по-разному они действуют: λ почти не меняет число листьев (около 15), а только сжимает их значения; γ = 0.2 оставляет в среднем 2 листа.</p>
+  <div class="callout warn"><p><b>γ измеряется в единицах потерь.</b> Выигрыш разбиения растёт с масштабом $y$ и числом объектов, поэтому «хорошее» γ для одних данных бессмысленно для других. На задаче Фридмана ($y$ порядка 15, 210 объектов) уже γ = 5 урезает деревья с 22 до 3 листьев и ухудшает качество: ½MSE 3.86 → 4.05, а при γ = 40 — 4.87. На этих же данных λ = 5 немного помогает (3.72). Поэтому γ подбирают по сетке в логарифмической шкале, начиная с малых значений, а в XGBoost по умолчанию γ = 0.</p></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="λ, γ и min_child_weight на шумных данных">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, GBRegressor
+
+X, y = datasets.friedman1(n=300, noise=2.0, seed=75)
+configs = {"без штрафов": {}, "λ = 5": dict(reg_lambda=5), "γ = 20": dict(gamma=20),
+           "min_child_weight = 10": dict(min_child_weight=10), "λ = 5 и γ = 20": dict(reg_lambda=5, gamma=20)}
+for name, kw in configs.items():
+    best, leaves = [], []
+    for split in range(3):
+        X_tr, X_val, y_tr, y_val = datasets.train_test_split(X, y, test_size=0.3, seed=split)
+        m = GBRegressor(mode="newton", n_estimators=200, learning_rate=0.1, max_depth=5, **kw).fit(X_tr, y_tr, eval_set=(X_val, y_val))
+        best.append(min(m.history_["eval"]))
+        leaves.append(np.mean([t.n_leaves for (t,) in m.trees_]))
+    print(f"{name:22s} лучшая ½MSE {np.mean(best):.3f}, листьев в среднем {np.mean(leaves):.1f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Структуру дерева ограничивают глубина, число листьев, минимум объектов и гессианов в листе.</li>
+    <li>λ сжимает веса листьев к нулю (сильнее — маленькие листья), α обнуляет слабые листья, γ запрещает невыгодные разбиения.</li>
+    <li>Все формулы — из регуляризованной цели XGBoost (урок 8.2).</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "L2-потери, лист из 4 объектов со средним остатком 1, λ = 4. Вес листа?", "options": ["1", "0.5", "0.25"], "answer": 1, "explain": "w = Σr/(n + λ) = 4/(4 + 4) = 0.5."},
+    {"q": "Какой параметр запрещает разбиение, выигрыш которого меньше заданного порога?", "options": ["gamma", "reg_lambda", "subsample"], "answer": 0, "explain": "gamma (min_split_gain в LightGBM)."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

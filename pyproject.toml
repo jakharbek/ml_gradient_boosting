@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gbcourse"
+version = "1.0.0"
+description = "Учебная библиотека курса «Градиентный бустинг по косточкам»: прозрачные реализации деревьев, бустинга, функций потерь и визуализаций."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Курс «Градиентный бустинг по косточкам»" }]
+keywords = ["gradient boosting", "machine learning", "education", "xgboost", "lightgbm", "catboost"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Intended Audience :: Education",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Natural Language :: Russian",
+]
+# Ядро gbcourse зависит только от numpy (работает и в браузере через Pyodide).
+# matplotlib нужен модулю gbcourse.plotting и импортируется лениво.
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+course = [
+  "pandas>=2.1",
+  "scipy>=1.11",
+  "scikit-learn>=1.4",
+  "matplotlib>=3.10",
+  "xgboost>=2.0",
+  "lightgbm>=4.3",
+  "catboost>=1.2.5",
+  "shap>=0.45",
+  "optuna>=3.6",
+  "jupyterlab>=4.1",
+  "ipykernel>=6.29",
+  "ipywidgets>=8.1",
+]
+dev = ["pytest>=8.0", "ruff>=0.5", "nbformat>=5.10", "nbclient>=0.10"]
+
+[tool.setuptools.packages.find]
+where = ["shared/python"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["lessons/*/jupyter_notebooks/*.ipynb", "examples/*/notebooks/*.ipynb"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "NPY"]
+ignore = ["E501", "E731", "B905"]
+
+[tool.ruff.lint.per-file-ignores]
+# Исходники ноутбуков: импорты после ячейки настройки окружения — это нормально.
+"lessons/*/jupyter_notebooks/*.py" = ["E402", "F401", "B018", "I001"]
+"lessons/*/examples/*.py" = ["E402", "I001"]
+"lessons/*/exercises/*.py" = ["E402", "I001"]

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_5_2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>5.2 Алгоритм Фридмана по строчкам</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Статья Джерома Фридмана «Greedy Function Approximation: A Gradient Boosting Machine» (2001) — первоисточник градиентного бустинга. Её алгоритм до сих пор лежит в основе <code>GradientBoostingRegressor</code> из scikit-learn и, с модификациями, всех современных библиотек.</p>
+  <p>В уроке <a data-lesson="lesson_5_1"></a> мы вывели направление шага. Здесь соберём полный алгоритм и разберём тонкость, которую легко пропустить: дерево строится по псевдо-остаткам, а значения его листьев — по исходным потерям.</p>
+</section>
+
+<section id="generic">
+  <h2>Алгоритм 1. Gradient_Boost</h2>
+  <div class="formula">$$\begin{aligned}
+  &amp;1.\ F_0(x) = \arg\min_\rho \textstyle\sum_{i=1}^n L(y_i, \rho) \\
+  &amp;2.\ \text{для } m = 1, \dots, M: \\
+  &amp;3.\quad \tilde y_i = -\Big[\frac{\partial L(y_i, F(x_i))}{\partial F(x_i)}\Big]_{F = F_{m-1}},\ i = 1..n \\
+  &amp;4.\quad \mathbf a_m = \arg\min_{\mathbf a, \beta} \textstyle\sum_i \big(\tilde y_i - \beta\, h(x_i; \mathbf a)\big)^2 \\
+  &amp;5.\quad \rho_m = \arg\min_\rho \textstyle\sum_i L\big(y_i,\ F_{m-1}(x_i) + \rho\, h(x_i; \mathbf a_m)\big) \\
+  &amp;6.\quad F_m(x) = F_{m-1}(x) + \rho_m\, h(x; \mathbf a_m)
+  \end{aligned}$$</div>
+  <div class="steps">
+    <section class="step">
+      <h4>Строка 1. Старт — лучшая константа</h4>
+      <p>Для L2 — среднее, для L1 — медиана, для log-loss — логарифм шансов (урок <a data-lesson="lesson_1_2"></a>). Это самая первая «модель».</p>
+    </section>
+    <section class="step">
+      <h4>Строка 3. Псевдо-остатки</h4>
+      <p>Антиградиент потерь в текущих прогнозах (урок <a data-lesson="lesson_5_1"></a>). Считается независимо для каждого объекта.</p>
+    </section>
+    <section class="step">
+      <h4>Строка 4. Базовая функция по наименьшим квадратам</h4>
+      <p>Какой бы ни была $L$, базовый ученик подгоняется к псевдо-остаткам <em>квадратичной</em> ошибкой. Это удобно: для деревьев есть быстрый алгоритм (модуль <a data-lesson="lesson_2">2</a>), и он один для всех потерь.</p>
+    </section>
+    <section class="step">
+      <h4>Строка 5. Линейный поиск</h4>
+      <p>Направление найдено, теперь — длина шага, оптимальная уже для исходных потерь $L$. Это одномерная задача, решаемая аналитически или численно.</p>
+    </section>
+    <section class="step">
+      <h4>Строка 6. Шаг</h4>
+      <p>Модель пополняется новым слагаемым. На практике добавляют множитель ν (shrinkage): $F_m = F_{m-1} + \nu \rho_m h_m$ — урок <a data-lesson="lesson_4_2"></a>.</p>
+    </section>
+  </div>
+</section>
+
+<section id="treeboost">
+  <h2>Алгоритм 2. TreeBoost: свой шаг в каждом листе</h2>
+  <p>Если базовый ученик — дерево с листьями $R_{1m}, \dots, R_{Jm}$, то один общий множитель $\rho_m$ — слишком грубо. Дерево само по себе — сумма $J$ индикаторов, и каждому можно подобрать свой коэффициент:</p>
+  <div class="formula">$$\gamma_{jm} = \arg\min_\gamma \sum_{x_i \in R_{jm}} L\big(y_i,\ F_{m-1}(x_i) + \gamma\big), \qquad F_m(x) = F_{m-1}(x) + \nu \sum_{j=1}^{J} \gamma_{jm}\,[x \in R_{jm}]$$</div>
+  <p>Задача для каждого листа — та самая «лучшая константа», только для остатков $y_i - F_{m-1}(x_i)$ объектов листа:</p>
+  <table>
+    <thead><tr><th>Потери</th><th>$\gamma_{jm}$ — значение листа</th></tr></thead>
+    <tbody>
+      <tr><td>L2</td><td>среднее остатков в листе (= среднее псевдо-остатков, пересчёт не нужен)</td></tr>
+      <tr><td>L1</td><td>медиана остатков $y_i - F_{m-1}(x_i)$ в листе</td></tr>
+      <tr><td>Квантильные (α)</td><td>α-квантиль остатков в листе</td></tr>
+      <tr><td>Хьюбер</td><td>$\tilde r + \frac{1}{n_j}\sum \operatorname{sign}(r_i - \tilde r)\min(\delta, |r_i - \tilde r|)$, $\tilde r$ — медиана (приближённый шаг Фридмана)</td></tr>
+      <tr><td>Log-loss</td><td>один шаг Ньютона: $\sum r_i / \sum p_i(1-p_i)$ (урок <a data-lesson="lesson_6_2"></a>)</td></tr>
+    </tbody>
+  </table>
+  <div data-widget="leaf-update"></div>
+  <div class="callout intuition"><p>Для L1 псевдо-остатки — это ±1, и их среднее в листе — число между −1 и 1, никак не связанное с реальным размером ошибки. Медиана же настоящих остатков сдвигает прогноз ровно на «типичную» ошибку листа. Структура дерева говорит <em>где</em> исправлять, линейный поиск — <em>насколько</em>.</p></div>
+</section>
+
+<section id="bones">
+  <h2>Разбор по косточкам</h2>
+  <div class="bones" data-title="Две роли дерева в TreeBoost">
+    <details class="bone" open><summary>Структура: разбиения по псевдо-остаткам</summary><div class="bone-body"><p>Разбиения выбираются критерием наименьших квадратов для $\tilde y$ — одинаково для любых потерь.</p></div></details>
+    <details class="bone"><summary>Значения: оптимум исходных потерь в каждом листе</summary><div class="bone-body">
+      <details class="bone"><summary data-go="lesson_1_2">Лучшая константа</summary><div class="bone-body"><p>Та же задача, что и для $F_0$, но для остатков объектов листа.</p></div></details>
+      <details class="bone"><summary data-go="lesson_8_2">Альтернатива — шаг Ньютона для всего дерева</summary><div class="bone-body"><p>XGBoost сразу строит дерево по $g$ и $h$, и значение листа $-G/(H+\lambda)$ получается «бесплатно». Структура и значения там согласованы.</p></div></details>
+    </div></details>
+    <details class="bone"><summary>Где это в коде</summary><div class="bone-body"><p><code>gbcourse/boosting.py</code>: построение дерева в <code>fit</code>, пересчёт листьев в <code>_line_search</code>; в scikit-learn — <code>_update_terminal_regions</code>.</p></div></details>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="TreeBoost против «среднего псевдо-остатков» для L1">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, RegressionTree
+
+X, y = datasets.regression_1d(kind="wave", n=300, noise=0.3, seed=53, outliers=0.1)
+X_tr, X_te, y_tr, y_te = datasets.train_test_split(X, y, test_size=0.3, seed=0)
+
+def boost_l1(line_search, M=200, nu=0.1):
+    F, F_te = np.full(len(y_tr), np.median(y_tr)), np.full(len(y_te), np.median(y_tr))
+    for m in range(M):
+        r = np.sign(y_tr - F)                                    # псевдо-остатки L1
+        tree = RegressionTree(max_depth=2).fit(X_tr, -r)         # структура по ним
+        if line_search:                                          # значения листьев — медианы остатков
+            for leaf in tree.leaves:
+                leaf.value = np.median(y_tr[leaf.rows] - F[leaf.rows])
+            tree.refresh_values()
+        F += nu * tree.predict(X_tr)
+        F_te += nu * tree.predict(X_te)
+    return np.mean(np.abs(y_te - F_te))
+
+print("MAE на тесте, листья = среднее знаков:   ", round(boost_l1(False), 4))
+print("MAE на тесте, листья = медиана остатков: ", round(boost_l1(True), 4))</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Gradient_Boost: псевдо-остатки → базовая функция по наименьшим квадратам → линейный поиск шага → обновление.</li>
+    <li>TreeBoost: для каждого листа свой оптимальный шаг $\gamma_{jm}$ — лучшая константа исходных потерь в листе.</li>
+    <li>Для L2 пересчёт не нужен, для L1 — медиана, для квантилей — квантиль, для log-loss — шаг Ньютона.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "По какому критерию ищутся разбиения дерева в TreeBoost для потерь L1?", "options": ["По наименьшим квадратам для псевдо-остатков", "По сумме модулей остатков", "По Джини"], "answer": 0, "explain": "Строка 4 алгоритма — всегда наименьшие квадраты."},
+    {"q": "Значение листа в TreeBoost для квантильных потерь с α = 0.9 — это…", "options": ["среднее остатков листа", "0.9-квантиль остатков y − F_{m−1} в листе", "0.9"], "answer": 1, "explain": "Лучшая константа для квантильных потерь — квантиль."},
+    {"q": "Почему для L2 пересчёт листьев не нужен?", "options": ["Среднее псевдо-остатков в листе уже и есть оптимум квадратичных потерь", "L2 не поддерживает линейный поиск", "Листья L2 всегда нулевые"], "answer": 0, "explain": "Псевдо-остатки L2 — это остатки, а их среднее — лучшая константа."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

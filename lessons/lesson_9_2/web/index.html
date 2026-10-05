@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_9_2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>9.2 LightGBM: рост по листьям, GOSS и связывание признаков</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">LightGBM (Ke и соавторы, 2017) родился как ответ на вопрос «как обучать бустинг на очень больших данных». Гистограммы (урок <a data-lesson="lesson_8_3"></a>) — его основа. Сверху — три идеи, и у каждой есть своя цена.</p>
+</section>
+
+<section id="leafwise">
+  <h2>Рост по листьям</h2>
+  <p>XGBoost по умолчанию растит дерево <b>по уровням</b> (depth-wise): делит все листья текущего уровня, потом следующего. LightGBM растит <b>по листьям</b> (leaf-wise): каждый раз делит тот лист, чьё разбиение даёт наибольший выигрыш, где бы он ни был.</p>
+  <div data-widget="growth-compare"></div>
+  <div class="bones" data-title="Рост по листьям по косточкам">
+    <details class="bone" open><summary>Выгода: тот же бюджет листьев — меньше ошибка</summary><div class="bone-body"><p>При одинаковом числе листьев рост по листьям уменьшает потери на обучении сильнее: листья тратятся там, где модель ошибается больше. Рост по уровням делит и участки, где делить почти нечего. В виджете это верно при любой глубине: ошибка на обучении у роста по листьям не больше.</p><p>На новых данных картина другая. При 8 и 16 листьях рост по листьям лучше (½MSE 0.076 против 0.083 и 0.049 против 0.052). При 64 листьях — хуже (0.056 против 0.045): он раньше начинает подгоняться под шум. Заметьте, что рост по уровням при глубине 6 дал только 50 листьев — часть узлов уже нечего было делить.</p></div></details>
+    <details class="bone"><summary>Цена: глубокие ветви и переобучение</summary><div class="bone-body"><p>Дерево из 31 листа может уйти в одну ветвь на глубину 20 и выделить несколько объектов. На маленьких данных это переобучение. Поэтому в LightGBM размер дерева задают <code>num_leaves</code>, а от узких листьев защищает <code>min_child_samples</code> (по умолчанию 20). При необходимости добавляют <code>max_depth</code>.</p></div></details>
+    <details class="bone"><summary>Цифры на маленьких данных</summary><div class="bone-body"><p>Задача Фридмана, 700 объектов для обучения, темп 0.05, ранняя остановка (ноутбук урока). Лучшая MSE на валидации: 4 листа — 1.84, 8 — 2.06, 16 — 2.14, 31 — 2.29. При 64 и 128 листьях ничего не меняется (2.29): 700 объектов при минимуме 20 в листе не дают вырастить больше 35 листьев. Если снизить <code>min_child_samples</code> до 5, ограничение исчезает, и 128 листьев дают уже 3.12.</p></div></details>
+  </div>
+  <div class="callout note"><p>Соотношение с глубиной: дерево глубины $d$ имеет не больше $2^d$ листьев. Поэтому <code>num_leaves</code> ≈ $2^{d}$ соответствует примерно глубине $d$, а <code>num_leaves</code> заметно меньше $2^{\text{max\_depth}}$ оставляет место для несимметричных деревьев.</p></div>
+</section>
+
+<section id="goss">
+  <h2>GOSS: выборка по градиентам</h2>
+  <p>Объект с маленьким $|g_i|$ уже хорошо описан моделью и почти не влияет на суммы $G_L, G_R$. GOSS (Gradient-based One-Side Sampling):</p>
+  <ol>
+    <li>берёт все $a \cdot n$ объектов с наибольшими $|g_i|$ (<code>top_rate</code>, по умолчанию 0.2);</li>
+    <li>из остальных случайно выбирает $b \cdot n$ (<code>other_rate</code>, по умолчанию 0.1);</li>
+    <li>умножает $g_i$ и $h_i$ выбранных «малых» объектов на $\frac{1-a}{b}$, чтобы суммы остались несмещёнными.</li>
+  </ol>
+  <div data-widget="goss-demo"></div>
+  <div class="bones" data-title="GOSS по косточкам">
+    <details class="bone" open><summary>Когда GOSS точнее равномерной подвыборки</summary><div class="bone-body"><p>Когда градиенты сконцентрированы. На «лунах» после 30 деревьев 20% объектов несут 84% суммы $|g|$, после 100 — 93%. Тогда GOSS теряет в среднем около 20% выигрыша лучшего разбиения по $x_0$, а равномерная подвыборка того же размера — 59% и 77% (ноутбук урока). В регрессии с шумом, где топ-20% несут лишь 46% суммы $|g|$, разница мала: 12% против 15%.</p></div></details>
+    <details class="bone"><summary>Не обязательно быстрее</summary><div class="bone-body"><p>В наших замерах (LightGBM 4.7, 300 000 строк, 50 признаков, 300 деревьев) время с GOSS и без выборки оказалось практически одинаковым: около 3.1–3.7 с, и в разных запусках быстрее был то один вариант, то другой. На каждой итерации нужно упорядочить градиенты, а гистограммы и так быстры. Зато по качеству GOSS (log-loss 0.226) заметно лучше равномерной подвыборки 30% строк (0.262), хотя обучение на всех данных лучше обоих (0.214).</p></div></details>
+    <details class="bone"><summary>Как включить</summary><div class="bone-body"><p>В LightGBM 4: <code>data_sample_strategy="goss"</code> (старое <code>boosting="goss"</code> устарело). Первые $\lfloor 1/\nu \rfloor$ итераций LightGBM не делает выборку: в начале большие градиенты у всех.</p></div></details>
+  </div>
+</section>
+
+<section id="efb">
+  <h2>EFB: связывание взаимоисключающих признаков</h2>
+  <p>После one-hot кодирования у объекта из сотен столбцов ненулевой только один. Такие признаки <b>взаимоисключающие</b>: они никогда не бывают ненулевыми одновременно. EFB (Exclusive Feature Bundling) склеивает их в один столбец со сдвигами:</p>
+  <table>
+    <thead><tr><th>город = A</th><th>город = B</th><th>город = C</th><th></th><th>связка</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td class="num">0</td><td class="num">0</td><td>→</td><td class="num">1</td></tr>
+      <tr><td class="num">0</td><td class="num">1</td><td class="num">0</td><td>→</td><td class="num">2</td></tr>
+      <tr><td class="num">0</td><td class="num">0</td><td class="num">1</td><td>→</td><td class="num">3</td></tr>
+      <tr><td class="num">0</td><td class="num">0</td><td class="num">0</td><td>→</td><td class="num">0</td></tr>
+    </tbody>
+  </table>
+  <p>Гистограмма строится по связке, а разбиения по исходным признакам восстанавливаются по диапазонам её значений — ничего не теряется. Поиск связок — задача раскраски графа; LightGBM решает её жадно и допускает небольшую долю конфликтов. В наших замерах (200 000 строк, 1000 разреженных one-hot столбцов) обучение ускорилось примерно в 1.2–1.4 раза (в разных запусках, например с 0.99 до 0.81 с или с 1.05 до 0.75 с) при той же ошибке. EFB включён по умолчанию (<code>enable_bundle=True</code>).</p>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <p>Код выполняется прямо в браузере (LightGBM 4.6 в Pyodide; в Jupyter-ноутбуке урока используется 4.7 с новым <code>eval_X</code>).</p>
+  <div class="pycell" data-title="num_leaves на маленьких данных">
+<pre><code class="language-python">import lightgbm as lgb
+from gbcourse import datasets
+
+X, y = datasets.friedman1(n=1000, noise=1.0, seed=94)
+X_tr, X_val, y_tr, y_val = datasets.train_test_split(X, y, test_size=0.3, seed=0)
+for leaves in (4, 16, 31):
+    m = lgb.LGBMRegressor(n_estimators=2000, learning_rate=0.05, num_leaves=leaves, verbose=-1)
+    m.fit(X_tr, y_tr, eval_set=[(X_val, y_val)], callbacks=[lgb.early_stopping(50, verbose=False)])
+    print(f"num_leaves = {leaves:2d}: лучшая MSE {min(m.evals_result_['valid_0']['l2']):.3f}, деревьев {m.best_iteration_}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Рост по листьям тратит листья там, где выигрыш больше; ограничивайте его через <code>num_leaves</code> и <code>min_child_samples</code>.</li>
+    <li>GOSS сохраняет объекты с большими градиентами и точнее равномерной подвыборки, когда градиенты сконцентрированы; заметного ускорения в наших замерах не было.</li>
+    <li>EFB склеивает взаимоисключающие разреженные признаки без потери информации.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "GOSS с a = 0.2, b = 0.1. На какой множитель умножаются градиенты случайно выбранных «малых» объектов?", "options": ["2", "8", "10"], "answer": 1, "explain": "(1 − a)/b = 0.8/0.1 = 8: каждый выбранный представляет 8 невыбранных."},
+    {"q": "700 объектов, min_child_samples = 20. Сколько листьев максимум может быть в дереве?", "options": ["31", "35", "сколько угодно"], "answer": 1, "explain": "В каждом листе не меньше 20 объектов: 700 / 20 = 35."},
+    {"q": "Какие признаки EFB может склеить без потерь?", "options": ["сильно коррелированные", "никогда не ненулевые одновременно", "с одинаковым распределением"], "answer": 1, "explain": "Взаимоисключающие — например, столбцы one-hot одного категориального признака."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

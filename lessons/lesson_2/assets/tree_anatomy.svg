@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 268" font-family="system-ui, Segoe UI, sans-serif" role="img" aria-label="Дерево глубины 2 на восьми квартирах: корень, два внутренних узла, четыре листа">
+  <title>Анатомия дерева решений</title>
+  <style>
+    .bg { fill: #fcfcfb; }
+    .e { stroke: #9a988f; stroke-width: 1.6; fill: none; }
+    .n { fill: #f3f2ee; stroke: #c3c2b7; }
+    .l { stroke: #c3c2b7; }
+    .t { font-size: 13px; fill: #0b0b0b; font-weight: 600; }
+    .s { font-size: 11px; fill: #52514e; }
+    .lab { font-size: 11px; fill: #7a7873; }
+    .cap { font-size: 11px; fill: #4a3aa7; font-weight: 600; }
+    .lvl { stroke: #c3c2b7; stroke-dasharray: 3 4; }
+  </style>
+  <rect class="bg" width="460" height="268" rx="10"/>
+  <line class="lvl" x1="96" y1="37" x2="452" y2="37"/><line class="lvl" x1="96" y1="121" x2="452" y2="121"/><line class="lvl" x1="96" y1="204" x2="452" y2="204"/>
+  <text class="cap" x="8" y="33">корень</text><text class="lab" x="8" y="47">уровень 0</text>
+  <text class="cap" x="8" y="117">узлы</text><text class="lab" x="8" y="131">уровень 1</text>
+  <text class="cap" x="8" y="200">листья</text><text class="lab" x="8" y="214">уровень 2</text>
+  <path class="e" d="M270 58 C 270 80, 180 80, 180 100"/>
+  <path class="e" d="M270 58 C 270 80, 360 80, 360 100"/>
+  <path class="e" d="M180 142 C 180 162, 135 162, 135 184"/>
+  <path class="e" d="M180 142 C 180 162, 225 162, 225 184"/>
+  <path class="e" d="M360 142 C 360 162, 315 162, 315 184"/>
+  <path class="e" d="M360 142 C 360 162, 405 162, 405 184"/>
+  <text class="lab" x="206" y="80">да</text><text class="lab" x="318" y="80">нет</text>
+  <rect class="n" x="205" y="16" width="130" height="42" rx="9"/>
+  <text class="t" x="270" y="36" text-anchor="middle">площадь ≤ 56</text><text class="s" x="270" y="51" text-anchor="middle">8 квартир</text>
+  <rect class="n" x="118" y="100" width="124" height="42" rx="9"/>
+  <text class="t" x="180" y="120" text-anchor="middle">до центра ≤ 6.5</text><text class="s" x="180" y="135" text-anchor="middle">4 квартиры</text>
+  <rect class="n" x="298" y="100" width="124" height="42" rx="9"/>
+  <text class="t" x="360" y="120" text-anchor="middle">до центра ≤ 5.5</text><text class="s" x="360" y="135" text-anchor="middle">4 квартиры</text>
+  <rect class="l" x="98" y="184" width="74" height="40" rx="9" fill="#cde2fb"/><text class="t" x="135" y="203" text-anchor="middle">5.4</text><text class="s" x="135" y="217" text-anchor="middle">2 кв.</text>
+  <rect class="l" x="188" y="184" width="74" height="40" rx="9" fill="#9ec5f4"/><text class="t" x="225" y="203" text-anchor="middle">3.3</text><text class="s" x="225" y="217" text-anchor="middle">2 кв.</text>
+  <rect class="l" x="278" y="184" width="74" height="40" rx="9" fill="#f0a3a2"/><text class="t" x="315" y="203" text-anchor="middle">10.1</text><text class="s" x="315" y="217" text-anchor="middle">2 кв.</text>
+  <rect class="l" x="368" y="184" width="74" height="40" rx="9" fill="#f6d6d5"/><text class="t" x="405" y="203" text-anchor="middle">7.4</text><text class="s" x="405" y="217" text-anchor="middle">2 кв.</text>
+  <text class="lab" x="98" y="250">в листьях — прогноз: средняя цена квартир листа, млн</text>
+</svg>

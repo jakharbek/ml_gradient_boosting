@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_1_3">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>1.3 Производная, градиент и градиентный спуск</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Градиентный бустинг — это градиентный спуск, только шагает он не по числам, а по функциям. Чтобы понять бустинг, сначала поймём обычный спуск.</p>
+  <p>В этом уроке три идеи: производная показывает, куда функция растёт; шаг против неё уменьшает функцию; длина шага решает, сойдёмся ли мы быстро, медленно или разлетимся. Все три напрямую переносятся на бустинг в уроке <a data-lesson="lesson_5_1"></a>.</p>
+</section>
+
+<section id="derivative">
+  <h2>Производная — это наклон</h2>
+  <p>Возьмём функцию одной переменной $f(\theta)$. Её <strong>производная</strong> $f'(\theta)$ — наклон касательной в точке $\theta$: насколько изменится $f$, если чуть сдвинуть $\theta$.</p>
+  <div class="formula">$$f'(\theta) = \lim_{\varepsilon \to 0} \frac{f(\theta + \varepsilon) - f(\theta)}{\varepsilon}, \qquad f(\theta + \Delta) \approx f(\theta) + f'(\theta)\,\Delta$$</div>
+  <ul>
+    <li>$f'(\theta) &gt; 0$ — функция растёт вправо; чтобы уменьшить её, надо идти <strong>влево</strong>;</li>
+    <li>$f'(\theta) &lt; 0$ — растёт влево; идти <strong>вправо</strong>;</li>
+    <li>$f'(\theta) = 0$ — касательная горизонтальна: минимум, максимум или «полочка».</li>
+  </ul>
+  <div class="callout intuition"><p>Представьте, что вы стоите на склоне в тумане и видите только землю под ногами. Самый надёжный способ спуститься — сделать шаг туда, где склон уходит вниз. Производная и есть «уклон под ногами».</p></div>
+  <div class="callout tip" data-title="Подробный разбор"><p>Секущие, предел, касательная, «полочки» и изломы — с анимациями и тренажёром — в уроке <a data-lesson="lesson_15_5"></a>. А вся математика с нуля — от функций и пределов до правил дифференцирования, метода Ньютона и градиента — в главе <a data-lesson="lesson_15"></a>.</p></div>
+</section>
+
+<section id="gd">
+  <h2>Градиентный спуск</h2>
+  <p>Правило простое: сдвигаемся против производной, умноженной на маленькое число $\eta$ — <strong>темп обучения</strong> (learning rate):</p>
+  <div class="formula">$$\theta_{k+1} = \theta_k - \eta\, f'(\theta_k)$$</div>
+  <p>Попробуйте разные функции и темпы. Оранжевые отрезки — касательные в точках пути: чем круче наклон, тем длиннее шаг.</p>
+  <div data-widget="gd-1d"></div>
+  <div class="bones" data-title="Разбор по косточкам: длина шага">
+    <details class="bone"><summary>Слишком маленький шаг</summary><div class="bone-body"><p>Спуск верный, но медленный: нужны сотни шагов. Вблизи минимума производная мала, и шаги становятся совсем крошечными.</p></div></details>
+    <details class="bone"><summary>Удачный шаг</summary><div class="bone-body"><p>Для параболы $f(\theta) = \tfrac{a}{2}\theta^2$ шаг $\eta = 1/a$ приводит в минимум за один ход: $\theta_1 = \theta_0 - \tfrac1a \cdot a\theta_0 = 0$.</p></div></details>
+    <details class="bone"><summary>Слишком большой шаг</summary><div class="bone-body">
+      <p>Для той же параболы $\theta_{k+1} = (1 - \eta a)\,\theta_k$. При $\eta a &gt; 1$ точка перепрыгивает минимум, при $\eta a &gt; 2$ — улетает всё дальше. Узнаёте множитель $(1-\nu)$ из «бустинга одного числа» урока <a data-lesson="lesson_1"></a>? Это одно и то же.</p>
+    </div></details>
+    <details class="bone"><summary data-go="lesson_8_1">Шаг Ньютона: знаем кривизну — знаем идеальный шаг</summary><div class="bone-body">
+      <p>Вторая производная $f''$ — кривизна. Если приблизить функцию параболой, её минимум находится за один шаг: $\theta_{k+1} = \theta_k - f'(\theta_k)/f''(\theta_k)$. Это идея XGBoost и значений листьев в классификации (урок <a data-lesson="lesson_6_2"></a>).</p>
+    </div></details>
+  </div>
+</section>
+
+<section id="gradient">
+  <h2>Много параметров: градиент</h2>
+  <p>Если параметров несколько, $\theta = (\theta_1, \dots, \theta_p)$, у функции есть наклон по каждому из них — <strong>частные производные</strong>. Вместе они образуют <strong>градиент</strong>:</p>
+  <div class="formula">$$\nabla f(\theta) = \left(\frac{\partial f}{\partial \theta_1}, \dots, \frac{\partial f}{\partial \theta_p}\right), \qquad \theta_{k+1} = \theta_k - \eta\, \nabla f(\theta_k)$$</div>
+  <p>Градиент указывает направление самого быстрого роста, антиградиент $-\nabla f$ — самого быстрого убывания. Ниже — подгонка прямой $\hat y = a x + b$ к точкам: функция $f(a, b)$ = MSE, линии уровня показывают «рельеф». Вытянутые эллипсы заставляют спуск идти зигзагом — так выглядит плохо обусловленная задача.</p>
+  <div data-widget="gd-2d"></div>
+</section>
+
+<section id="link">
+  <h2>Связь с бустингом</h2>
+  <p>Подберём спуском одну константу $c$ под MSE: $f(c) = \frac1n\sum \tfrac12 (y_i - c)^2$, производная $f'(c) = -\frac1n\sum (y_i - c)$ — минус средний остаток. Шаг спуска:</p>
+  <div class="formula">$$c_{k+1} = c_k + \eta \cdot \underbrace{\tfrac{1}{n}\textstyle\sum_i (y_i - c_k)}_{\text{средний остаток}}$$</div>
+  <p>То есть «сдвинь прогноз на долю среднего остатка». Бустинг делает то же самое, но для <em>каждого объекта</em> свой остаток, а обобщает их на новые точки дерево. Это и есть функциональный градиентный спуск — тема урока <a data-lesson="lesson_5_1"></a>.</p>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Градиентный спуск и шаг Ньютона">
+<pre><code class="language-python">import numpy as np
+
+f = lambda t: 0.5 * 3 * t**2 + np.sin(3 * t)          # функция с «волной»
+df = lambda t: 3 * t + 3 * np.cos(3 * t)               # её производная
+d2f = lambda t: 3 - 9 * np.sin(3 * t)                  # вторая производная
+
+for eta in (0.05, 0.2, 0.7):
+    t = 2.0
+    for k in range(30):
+        t -= eta * df(t)
+    print(f"градиентный спуск, η = {eta}: θ = {t: .4f}, f(θ) = {f(t): .4f}")
+
+t = 2.0
+for k in range(6):
+    t -= df(t) / d2f(t) if d2f(t) > 0 else 0.1 * df(t)  # Ньютон там, где кривизна положительна
+    print(f"Ньютон, шаг {k + 1}: θ = {t: .6f}, f'(θ) = {df(t): .2e}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Производная — наклон; её знак говорит, куда функция растёт.</li>
+    <li>Градиентный спуск: $\theta \leftarrow \theta - \eta \nabla f$. Темп $\eta$ решает скорость и устойчивость.</li>
+    <li>Слишком большой шаг перепрыгивает минимум или расходится; слишком маленький — медленно ползёт.</li>
+    <li>Шаг Ньютона $-f'/f''$ учитывает кривизну и часто сходится за несколько шагов.</li>
+    <li>Спуск для константы под MSE = «прибавь долю среднего остатка» — зародыш бустинга.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "f(θ) = θ², θ₀ = 3, η = 0.1. Чему равно θ₁?", "options": ["2.4", "3.6", "0.3"], "answer": 0, "explain": "f'(θ) = 2θ = 6; θ₁ = 3 − 0.1·6 = 2.4."},
+    {"q": "Для f(θ) = θ² при каком η спуск расходится?", "options": ["η = 0.4", "η = 0.9", "η = 1.2"], "answer": 2, "explain": "θ ← (1 − 2η)θ; расходится при |1 − 2η| > 1, то есть η > 1."},
+    {"q": "Куда указывает антиградиент −∇f?", "options": ["В направлении самого быстрого убывания f", "В минимум функции", "Перпендикулярно минимуму"], "answer": 0, "explain": "Локально — направление быстрейшего убывания. В минимум он указывает не всегда (например, при вытянутых линиях уровня — зигзаг)."},
+    {"q": "Шаг Ньютона для f(θ) = 5θ² из любой точки…", "options": ["приводит в минимум за один шаг", "расходится", "требует темпа η"], "answer": 0, "explain": "f' = 10θ, f'' = 10, θ − f'/f'' = θ − θ = 0. Для параболы Ньютон точен."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

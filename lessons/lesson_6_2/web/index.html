@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_6_2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>6.2 Значения листьев: шаг Ньютона</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">В TreeBoost значение листа — лучшая константная добавка для исходных потерь (урок <a data-lesson="lesson_5_2"></a>). Для L1 это медиана, а для log-loss явной формулы нет. Фридман предложил сделать один шаг Ньютона — и этот же приём стал сердцем XGBoost.</p>
+</section>
+
+<section id="problem">
+  <h2>Задача листа</h2>
+  <p>В листе $R_j$ объекты с ответами $y_i$ и текущими логитами $F_i$. Ищем добавку $\gamma$:</p>
+  <div class="formula">$$\gamma_j = \arg\min_\gamma \; \Phi(\gamma), \qquad \Phi(\gamma) = \sum_{i \in R_j} L\big(y_i, F_i + \gamma\big) = \sum_{i\in R_j} \Big[\log\big(1 + e^{F_i + \gamma}\big) - y_i (F_i + \gamma)\Big]$$</div>
+  <p>Условие минимума $\Phi'(\gamma) = \sum_i \big(\sigma(F_i + \gamma) - y_i\big) = 0$ — нелинейное уравнение без решения в общем виде.</p>
+</section>
+
+<section id="newton">
+  <h2>Шаг Ньютона</h2>
+  <p>Разложим $\Phi$ в ряд Тейлора около $\gamma = 0$ до второго порядка (урок <a data-lesson="lesson_1_3"></a>):</p>
+  <div class="formula">$$\Phi(\gamma) \approx \Phi(0) + \gamma \sum_i g_i + \frac{\gamma^2}{2}\sum_i h_i, \qquad g_i = p_i - y_i,\ h_i = p_i(1 - p_i)$$</div>
+  <p>Минимум параболы — там, где производная равна нулю:</p>
+  <div class="formula">$$\gamma_j = -\frac{\sum_{i\in R_j} g_i}{\sum_{i \in R_j} h_i} = \frac{\sum_{i\in R_j} (y_i - p_i)}{\sum_{i\in R_j} p_i (1 - p_i)}$$</div>
+  <p>Смысл: числитель — сколько «не хватает» вероятности в листе; знаменатель — насколько чувствительны вероятности к сдвигу логита. Где модель уверена ($p$ близко к 0 или 1), знаменатель мал — и нужен больший сдвиг логита.</p>
+  <div data-widget="newton-leaf"></div>
+</section>
+
+<section id="by-hand">
+  <h2>Первая итерация вручную</h2>
+  <p>Восемь точек: $x = 1..8$, $y = (0, 0, 0, 1, 0, 1, 1, 1)$. Пни, ν = 1.</p>
+  <div class="steps">
+    <section class="step">
+      <h4>Шаг 0. Старт</h4>
+      <p>Доля единиц $\bar y = 0.5$, значит $F_0 = \log\frac{0.5}{0.5} = 0$ и $p_i = 0.5$ для всех. Псевдо-остатки $r_i = y_i - 0.5 = \pm 0.5$, гессианы $h_i = 0.25$.</p>
+    </section>
+    <section class="step">
+      <h4>Шаг 1. Структура пня</h4>
+      <p>Разбиение ищем по псевдо-остаткам, как в регрессии. Пороги 3.5 и 5.5 дают одинаковый выигрыш 1.2 (симметрия); первый по порядку — 3.5. Слева $x \in \{1, 2, 3\}$ — все класса 0; справа пять точек, из них одна класса 0.</p>
+    </section>
+    <section class="step">
+      <h4>Шаг 2. Значения листьев</h4>
+      <div class="formula">$$\gamma_{\text{лев}} = \frac{-0.5 \cdot 3}{0.25 \cdot 3} = -2, \qquad \gamma_{\text{прав}} = \frac{0.5 \cdot 4 - 0.5}{0.25 \cdot 5} = \frac{1.5}{1.25} = 1.2$$</div>
+      <p>Для сравнения, среднее псевдо-остатков дало бы −0.5 и 0.3 — в четыре раза меньше: без деления на гессиан шаг в логитах слишком робкий.</p>
+    </section>
+    <section class="step">
+      <h4>Шаг 3. Новые вероятности</h4>
+      <p>$F_1 = -2$ слева: $p = \sigma(-2) \approx 0.119$. $F_1 = 1.2$ справа: $p = \sigma(1.2) \approx 0.769$. Точный оптимум для правого листа — там, где средняя вероятность равна доле единиц: $\sigma(\gamma) = 0.8$, $\gamma = \log 4 \approx 1.386$. Ньютон дал 1.2 — недолёт на 13%, зато без итераций. А для левого листа точного конечного оптимума нет вовсе (все объекты одного класса, $\gamma \to -\infty$), и шаг Ньютона разумно ограничивает прыжок.</p>
+    </section>
+  </div>
+  <div class="callout tip"><p>Проверьте в песочнице модуля <a data-lesson="lesson_6">6</a> или в ячейке ниже: <code>GBClassifier(n_estimators=1, learning_rate=1, max_depth=1)</code> на этих точках даёт ровно −2 и 1.2.</p></div>
+</section>
+
+<section id="bones">
+  <h2>Разбор по косточкам</h2>
+  <div class="bones" data-title="Шаг Ньютона по косточкам">
+    <details class="bone" open><summary>Градиент листа $G = \sum g_i$</summary><div class="bone-body"><p>Куда и насколько тянет лист; для log-loss $G = \sum(p_i - y_i)$.</p></div></details>
+    <details class="bone"><summary>Гессиан листа $H = \sum h_i$</summary><div class="bone-body"><p>Кривизна: насколько быстро меняются потери; $H = \sum p_i(1 - p_i)$. «Эффективное число объектов» листа.</p></div></details>
+    <details class="bone"><summary>Шаг $-G/H$</summary><div class="bone-body">
+      <p>Минимум параболического приближения.</p>
+      <details class="bone"><summary data-go="lesson_8_2">С регуляризацией: $-G/(H + \lambda)$</summary><div class="bone-body"><p>XGBoost добавляет λ в знаменатель — это спасает листья, где $H$ почти ноль (чистые уверенные листья), от гигантских значений.</p></div></details>
+    </div></details>
+    <details class="bone"><summary data-go="lesson_8_1">Обобщение: бустинг второго порядка</summary><div class="bone-body"><p>Если строить по $g$ и $h$ и саму структуру дерева, получится XGBoost.</p></div></details>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Ручной расчёт против gbcourse и sklearn">
+<pre><code class="language-python">import numpy as np
+from sklearn.ensemble import GradientBoostingClassifier
+from gbcourse import datasets, GBClassifier
+
+X, y = datasets.toy_classification()
+m = GBClassifier(n_estimators=1, learning_rate=1.0, max_depth=1).fit(X, y)
+tree = m.trees_[0][0]
+root = tree.nodes[0]
+print("F0 =", m.init_, "| порог:", root.threshold)
+print("листья (шаг Ньютона):", tree.nodes[root.left].value, tree.nodes[root.right].value)
+sk = GradientBoostingClassifier(n_estimators=1, learning_rate=1.0, max_depth=1).fit(X, y)
+print("sklearn F1:", sk.decision_function(X).round(4))
+
+# точный оптимум правого листа: σ(γ) = доля единиц 0.8
+print("точный γ правого листа = log 4 =", round(np.log(4), 4))</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Значение листа для log-loss — минимум нелинейной функции; явной формулы нет.</li>
+    <li>Один шаг Ньютона: $\gamma = \sum(y_i - p_i) / \sum p_i(1-p_i)$ — почти точный оптимум без итераций.</li>
+    <li>На восьми точках: $F_0 = 0$, порог 3.5, листья −2 и 1.2.</li>
+    <li>Та же формула $-G/H$ (с $+\lambda$) — основа значений листьев XGBoost.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "В листе 4 объекта с p = 0.5: три класса 1, один класса 0. Шаг Ньютона γ?", "options": ["2", "0.5", "1"], "answer": 2, "explain": "Σ(y − p) = 3·0.5 − 0.5 = 1, Σp(1 − p) = 4·0.25 = 1, γ = 1/1 = 1."},
+    {"q": "Почему шаг Ньютона больше среднего псевдо-остатков?", "options": ["Он делится на Σp(1 − p) ≤ n/4: сдвиг логита должен быть больше сдвига вероятности", "Из-за темпа обучения", "Он всегда равен среднему"], "answer": 0, "explain": "Гессиан p(1 − p) ≤ 0.25, поэтому Σh меньше числа объектов, и шаг в логитах крупнее."},
+    {"q": "Что грозит листу, где все объекты одного класса и модель уже уверена (p ≈ 0)?", "options": ["Σp(1 − p) ≈ 0, и шаг −G/H может стать огромным", "Ничего", "Лист удаляется"], "answer": 0, "explain": "Поэтому XGBoost добавляет λ в знаменатель и ограничивает шаг (max_delta_step)."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

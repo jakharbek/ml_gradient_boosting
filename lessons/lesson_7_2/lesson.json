@@ -1,0 +1,25 @@
+{
+  "id": "lesson_7_2",
+  "title": "Стохастический бустинг: подвыборки строк и признаков",
+  "short": "Подвыборки",
+  "subtitle": "Каждое дерево видит лишь часть объектов и признаков — модель учится медленнее, но обобщает лучше и считается быстрее",
+  "summary": "Stochastic Gradient Boosting (Фридман, 2002): subsample без возвращения, colsample по дереву/уровню/узлу, почему случайность помогает только вместе с маленьким темпом, выигрыш по времени, параметры в библиотеках.",
+  "level": 2,
+  "duration": 35,
+  "prerequisites": ["lesson_7_1", "lesson_3_1"],
+  "objectives": [
+    "объяснить механизм стохастического бустинга и его связь с бэггингом",
+    "выбирать subsample и colsample и понимать их взаимодействие с темпом обучения",
+    "настраивать подвыборки в scikit-learn, XGBoost, LightGBM, CatBoost"
+  ],
+  "keywords": ["subsample", "colsample", "stochastic gradient boosting", "bagging_fraction", "feature_fraction", "rsm"],
+  "datasets": [
+    {
+      "file": "data/friedman1_400.csv",
+      "generator": "friedman1",
+      "params": {"n": 400, "noise": 1.0, "seed": 74, "n_features": 10},
+      "title": "Задача Фридмана №1, 400 объектов",
+      "description": "10 признаков, 5 шумовых: удобно для подвыборки признаков."
+    }
+  ]
+}

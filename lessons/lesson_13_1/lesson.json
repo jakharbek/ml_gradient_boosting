@@ -1,0 +1,25 @@
+{
+  "id": "lesson_13_1",
+  "title": "Ранжирование: LambdaMART",
+  "short": "Ранжирование",
+  "subtitle": "Когда важен не прогноз, а порядок: NDCG, попарные потери и «лямбды» — градиенты, взвешенные тем, насколько перестановка меняет метрику",
+  "summary": "Задача ранжирования: запросы, документы, оценки релевантности. Метрика NDCG@k. Поточечный, попарный (RankNet) и списочный (LambdaRank) подходы; LambdaMART — бустинг второго порядка по «лямбдам». Реализация своими руками на дереве gbcourse и сравнение с LightGBM и XGBoost.",
+  "level": 4,
+  "duration": 45,
+  "prerequisites": ["lesson_13", "lesson_8_2"],
+  "objectives": [
+    "вычислять DCG и NDCG@k",
+    "объяснить попарную потерю RankNet и вес |ΔNDCG| в LambdaRank",
+    "обучить ранжирующую модель в LightGBM и XGBoost"
+  ],
+  "keywords": ["ранжирование", "learning to rank", "NDCG", "RankNet", "LambdaRank", "LambdaMART", "LGBMRanker", "XGBRanker"],
+  "datasets": [
+    {
+      "file": "data/toy_regression.csv",
+      "generator": "toy_regression",
+      "params": {},
+      "title": "Служебный набор",
+      "description": "Данные для ранжирования (запросы и документы) генерируются в примере lambdamart.py."
+    }
+  ]
+}

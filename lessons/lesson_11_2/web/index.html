@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_11_2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>11.2 Кросс-валидация и поиск параметров</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="results.js,lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Поиск параметров — это много сравнений «вариант A лучше варианта B?». Каждое сравнение шумное, а вариантов много. Нужно две вещи: надёжная оценка одного варианта и разумный способ выбирать, какие варианты пробовать.</p>
+</section>
+
+<section id="cv">
+  <h2>Оценка варианта: кросс-валидация</h2>
+  <p><b>K-кратная кросс-валидация</b>: данные делятся на $K$ частей (фолдов), модель обучается $K$ раз, каждый раз оценивается на одной части и обучается на остальных; оценка — среднее. Каждый объект побывает в валидации ровно один раз.</p>
+  <p>Проверка в ноутбуке урока: каждую конфигурацию оценили десятью разными разбиениями 80/20 и десятью разными 5-кратными CV.</p>
+  <table>
+    <thead><tr><th>Конфигурация</th><th>Одно разбиение: среднее ± σ</th><th>5-кратная CV: среднее ± σ</th></tr></thead>
+    <tbody>
+      <tr><td>31 лист</td><td class="num">1.254 ± 0.055</td><td class="num">1.268 ± 0.010</td></tr>
+      <tr><td>4 листа</td><td class="num">1.155 ± 0.029</td><td class="num">1.177 ± 0.008</td></tr>
+    </tbody>
+  </table>
+  <p>Оценка CV в 3–6 раз стабильнее. С одним разбиением разница между конфигурациями (≈ 0.1) лишь вдвое больше разброса самой оценки — неудачное разбиение могло бы её исказить. Цена — $K$ обучений вместо одного.</p>
+  <div class="bones" data-title="Кросс-валидация по косточкам">
+    <details class="bone" open><summary>Ранняя остановка внутри CV</summary><div class="bone-body"><p>Число деревьев подбирают на каждом фолде по его валидационной части. Для итоговой модели на всех данных берут среднее число деревьев по фолдам (или чуть больше — данных стало больше).</p></div></details>
+    <details class="bone"><summary>Вложенная CV</summary><div class="bone-body"><p>Если CV использовалась для <b>выбора</b> параметров, её оценка у лучшего варианта оптимистична: из многих вариантов мы выбрали тот, которому повезло. Честная оценка всей процедуры — внешняя CV, внутри каждого фолда которой идёт свой поиск параметров (упражнение 1). Проще: отложенный тест, на который смотрят один раз.</p></div></details>
+    <details class="bone"><summary>Правильное разбиение</summary><div class="bone-body"><p>Для классов — стратификация (<code>StratifiedKFold</code>), для групп (несколько строк одного клиента) — <code>GroupKFold</code>, для времени — только «прошлое → будущее» (<code>TimeSeriesSplit</code>). Иначе оценка заглядывает в данные, которых при эксплуатации не будет.</p></div></details>
+  </div>
+</section>
+
+<section id="search">
+  <h2>Сетка против случайного поиска</h2>
+  <p>Мы заранее посчитали ошибку LightGBM в 528 точках: 11 значений <code>num_leaves</code> × 8 значений <code>colsample_bytree</code> × 6 значений <code>subsample</code> (скрипт <code>examples/search_grid.py</code>). Теперь можно сколько угодно раз «запускать» разные стратегии поиска на этой поверхности и сравнивать их с одинаковым бюджетом.</p>
+  <div data-widget="search-sim"></div>
+  <p>Почему случайный поиск выигрывает (Бергстра и Бенжио, 2012)? На этой поверхности важен в основном один параметр: лучшая ошибка по значениям <code>num_leaves</code> меняется от 1.13 до 1.73, а по <code>subsample</code> — только от 1.129 до 1.152. Сетка из 27 точек проверяет всего 3 значения важного параметра и тратит бюджет на повторы по неважным. 27 случайных точек дают до 27 разных значений каждого параметра. В ноутбуке случайный поиск оказался лучше сетки с вероятностью 0.9995, 0.997 и 0.987 при бюджетах 8, 27 и 64.</p>
+</section>
+
+<section id="tpe">
+  <h2>Байесовский поиск: TPE в Optuna</h2>
+  <p>Случайный поиск не учится на своих результатах. TPE (Tree-structured Parzen Estimator), сэмплер Optuna по умолчанию, делит уже проверенные точки на «хорошие» и «плохие» и строит для каждой группы оценку плотности $\ell(x)$ и $g(x)$. Следующую точку он выбирает там, где отношение $\ell(x)/g(x)$ велико, то есть где хорошие результаты вероятнее.</p>
+  <div class="bones" data-title="Optuna по косточкам">
+    <details class="bone" open><summary>Пространство поиска</summary><div class="bone-body"><p><code>trial.suggest_int("num_leaves", 2, 128, log=True)</code>, <code>suggest_float("learning_rate", 0.01, 0.3, log=True)</code>. Логарифмическая шкала — для параметров, у которых важен порядок величины (темп, штрафы, размер листьев).</p></div></details>
+    <details class="bone"><summary>Что дал TPE</summary><div class="bone-body"><p>Шесть параметров LightGBM, 40 запусков, три повтора (ноутбук). Первые 10 запусков TPE случайные, поэтому до 10 результаты совпали (1.1545). Дальше TPE ушёл вперёд: 1.1497 после 20 и 1.1422 после 40 запусков против 1.1545 у случайного поиска. Выигрыш реальный, но скромный. Главное всё равно сделала ранняя остановка и разумное пространство поиска.</p></div></details>
+    <details class="bone"><summary>Отсечение (pruning)</summary><div class="bone-body"><p>Запуск отчитывается промежуточной ошибкой (<code>trial.report</code>), и <code>MedianPruner</code> прекращает его, если он хуже медианы прошлых запусков на том же шаге. В примере ноутбука из 30 запусков 22 были остановлены досрочно — поиск стал в разы дешевле.</p></div></details>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <p>Optuna в браузерной сборке Python нет, поэтому код — для Jupyter (полная версия — в ноутбуке урока).</p>
+<pre><code class="language-python">import optuna, lightgbm as lgb, numpy as np
+
+def objective(trial):
+    params = dict(
+        num_leaves=trial.suggest_int("num_leaves", 2, 128, log=True),
+        learning_rate=trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+        colsample_bytree=trial.suggest_float("colsample_bytree", 0.3, 1.0),
+        min_child_samples=trial.suggest_int("min_child_samples", 2, 100, log=True),
+    )
+    model = lgb.LGBMRegressor(n_estimators=5000, verbose=-1, **params)
+    model.fit(X_tr, y_tr, eval_X=(X_val,), eval_y=(y_val,), callbacks=[lgb.early_stopping(50, verbose=False)])
+    return np.sqrt(min(model.evals_result_["valid_0"]["l2"]))
+
+study = optuna.create_study(sampler=optuna.samplers.TPESampler(seed=0))
+study.optimize(objective, n_trials=40)
+print(study.best_params, study.best_value)</code></pre>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Кросс-валидация даёт в разы более стабильную оценку, чем одно разбиение; для честной оценки после поиска нужен отложенный тест или вложенная CV.</li>
+    <li>Случайный поиск эффективнее сетки, когда важны не все параметры, — а так почти всегда.</li>
+    <li>TPE учится на прошлых запусках и после первых случайных обычно немного обгоняет случайный поиск; отсечение экономит время.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Бюджет 27 запусков, 3 параметра, важен только один. Сколько разных значений важного параметра проверит сетка 3 × 3 × 3 и случайный поиск?", "options": ["3 и до 27", "27 и 3", "9 и 9"], "answer": 0, "explain": "Сетка повторяет каждое значение важного параметра 9 раз с разными неважными."},
+    {"q": "Параметры выбрали по 5-кратной CV, её лучшая оценка — 1.14. Это честная оценка качества на новых данных?", "options": ["да", "нет, она оптимистична — нужен отложенный тест или вложенная CV", "нет, она пессимистична"], "answer": 1, "explain": "Среди многих вариантов выбран лучший по этой же оценке — ему могло повезти."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

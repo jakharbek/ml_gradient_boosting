@@ -1,0 +1,81 @@
+[
+  {
+    "name": "reg_squared_depth3",
+    "data": {"name": "regression_1d", "params": {"kind": "wave", "n": 150, "noise": 0.4, "seed": 3}},
+    "model": {"loss": "squared", "n_estimators": 60, "learning_rate": 0.1, "max_depth": 3}
+  },
+  {
+    "name": "reg_toy_manual",
+    "data": {"name": "toy_regression", "params": {}},
+    "model": {"loss": "squared", "n_estimators": 3, "learning_rate": 1.0, "max_depth": 1}
+  },
+  {
+    "name": "reg_huber_subsample",
+    "data": {"name": "regression_1d", "params": {"kind": "sine", "n": 120, "noise": 0.3, "seed": 11, "outliers": 0.1}},
+    "model": {"loss": "huber", "huber_delta": 0.8, "n_estimators": 50, "learning_rate": 0.2, "max_depth": 2, "subsample": 0.7, "seed": 5}
+  },
+  {
+    "name": "reg_absolute",
+    "data": {"name": "regression_1d", "params": {"kind": "step", "n": 90, "noise": 0.5, "seed": 2, "outliers": 0.05}},
+    "model": {"loss": "absolute", "n_estimators": 40, "learning_rate": 0.3, "max_depth": 2}
+  },
+  {
+    "name": "reg_quantile_090",
+    "data": {"name": "regression_1d", "params": {"kind": "hetero", "n": 160, "noise": 0.5, "seed": 8}},
+    "model": {"loss": "quantile", "quantile_alpha": 0.9, "n_estimators": 60, "learning_rate": 0.1, "max_depth": 3}
+  },
+  {
+    "name": "reg_newton_regularized",
+    "data": {"name": "friedman1", "params": {"n": 200, "noise": 1.0, "seed": 4, "n_features": 6}},
+    "model": {"loss": "squared", "mode": "newton", "reg_lambda": 1.5, "reg_alpha": 0.3, "gamma": 0.2, "min_child_weight": 3, "n_estimators": 40, "learning_rate": 0.2, "max_depth": 3}
+  },
+  {
+    "name": "reg_leafwise_colsample",
+    "data": {"name": "friedman1", "params": {"n": 220, "noise": 0.5, "seed": 9, "n_features": 8}},
+    "model": {"loss": "squared", "growth": "leafwise", "max_leaves": 7, "max_depth": null, "colsample": 0.6, "colsample_bynode": 0.7, "subsample": 0.8, "n_estimators": 30, "learning_rate": 0.15, "seed": 21}
+  },
+  {
+    "name": "reg_hist_missing",
+    "data": {"name": "friedman1", "params": {"n": 200, "noise": 0.8, "seed": 13, "n_features": 5}},
+    "missing": 0.15,
+    "model": {"loss": "squared", "mode": "newton", "max_bins": 12, "reg_lambda": 1.0, "n_estimators": 30, "learning_rate": 0.2, "max_depth": 3}
+  },
+  {
+    "name": "reg_exact_missing",
+    "data": {"name": "friedman1", "params": {"n": 160, "noise": 0.8, "seed": 17, "n_features": 5}},
+    "missing": 0.2,
+    "model": {"loss": "squared", "n_estimators": 25, "learning_rate": 0.2, "max_depth": 3, "min_samples_leaf": 3}
+  },
+  {
+    "name": "reg_poisson",
+    "data": {"name": "regression_1d", "params": {"kind": "linear", "n": 120, "noise": 1.0, "seed": 6}},
+    "y_transform": "floor_abs",
+    "model": {"loss": "poisson", "n_estimators": 40, "learning_rate": 0.1, "max_depth": 2}
+  },
+  {
+    "name": "cls_logistic_moons",
+    "data": {"name": "classification_2d", "params": {"kind": "moons", "n": 200, "noise": 0.25, "seed": 1}},
+    "model": {"loss": "logistic", "n_estimators": 50, "learning_rate": 0.2, "max_depth": 3}
+  },
+  {
+    "name": "cls_logistic_newton_hist",
+    "data": {"name": "classification_2d", "params": {"kind": "spiral", "n": 240, "noise": 0.05, "seed": 7}},
+    "model": {"loss": "logistic", "mode": "newton", "max_bins": 20, "reg_lambda": 1.0, "min_child_weight": 1.0, "subsample": 0.8, "n_estimators": 60, "learning_rate": 0.3, "max_depth": 4, "seed": 3}
+  },
+  {
+    "name": "cls_softmax_friedman",
+    "data": {"name": "classification_2d", "params": {"kind": "blobs3", "n": 210, "noise": 0.7, "seed": 12}},
+    "model": {"loss": "softmax", "n_estimators": 30, "learning_rate": 0.2, "max_depth": 2}
+  },
+  {
+    "name": "cls_softmax_newton",
+    "data": {"name": "classification_2d", "params": {"kind": "blobs3", "n": 180, "noise": 0.8, "seed": 14}},
+    "model": {"loss": "softmax", "mode": "newton", "reg_lambda": 0.5, "colsample": 0.5, "n_estimators": 25, "learning_rate": 0.3, "max_depth": 2, "seed": 2}
+  },
+  {
+    "name": "cls_imbalanced_early_stop",
+    "data": {"name": "classification_2d", "params": {"kind": "blobs", "n": 300, "noise": 0.9, "seed": 5, "balance": 0.15}},
+    "split": {"test_size": 0.3, "seed": 1},
+    "model": {"loss": "logistic", "n_estimators": 200, "learning_rate": 0.3, "max_depth": 3, "early_stopping_rounds": 10}
+  }
+]

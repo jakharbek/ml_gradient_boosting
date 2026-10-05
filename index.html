@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Градиентный бустинг по косточкам — интерактивный курс</title>
+  <meta name="description" content="Интерактивный курс по градиентному бустингу: от первого дерева решений до XGBoost, LightGBM и CatBoost. Каждое понятие — по косточкам, каждый пример — живой.">
+  <link rel="icon" href="shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="shared/web/css/course.css">
+  <script src="shared/web/js/boot.js" data-root="./" data-page="home"></script>
+</head>
+<body>
+<main class="home-wrap" id="home">
+  <section class="home-hero">
+    <div>
+      <div class="eyebrow" id="course-stats">Интерактивный курс</div>
+      <h1>Градиентный бустинг по&nbsp;косточкам</h1>
+      <p>От первого дерева решений до XGBoost, LightGBM и CatBoost. Каждое понятие разбираем на элементы, каждый элемент — на ещё более мелкие, пока не останутся очевидные основы.</p>
+      <p>Все примеры живые: меняйте параметры прямо на странице, запускайте настоящий Python в браузере и повторяйте то же самое в Jupyter — данные и модели совпадают до последнего знака.</p>
+      <div class="cta">
+        <a class="btn primary" id="start-btn" href="lessons/lesson_1/web/index.html">Начать с урока 1</a>
+        <a class="btn" id="continue-btn" href="#" hidden><span>Продолжить</span></a>
+        <a class="btn ghost" href="#curriculum-section">Программа курса</a>
+      </div>
+    </div>
+    <div data-widget="hero-demo"></div>
+  </section>
+
+  <section class="home-section" id="map-section">
+    <h2>Вся формула — по косточкам</h2>
+    <p class="sub">Градиентный бустинг помещается в одну строку. Нажмите на любую её часть: она раскроется в дерево понятий, а каждое понятие ведёт к уроку, где его разбирают до основания.</p>
+    <div class="formula-map" id="formula-map"></div>
+  </section>
+
+  <section class="home-section" id="curriculum-section">
+    <h2>Программа</h2>
+    <p class="sub">Четыре части: от фундамента к алгоритму, от алгоритма — к современным библиотекам, от библиотек — к практике. Каждый модуль открывается обзором, который показывает, из каких уроков он состоит.</p>
+    <div id="curriculum"></div>
+  </section>
+
+  <section class="home-section" id="howto">
+    <h2>Как устроен каждый урок</h2>
+    <p class="sub">Одна тема — пять способов её потрогать. Все материалы урока лежат в его папке <code>lessons/lesson_X_Y/</code>.</p>
+    <div class="howto-grid">
+      <div class="card">
+        <h3>1. Интерактивная страница</h3>
+        <p>Теория с формулами, пошаговые разборы, виджеты с ползунками и блоки «Разбор по косточкам» — от общего к частному.</p>
+      </div>
+      <div class="card">
+        <h3>2. Python прямо в браузере</h3>
+        <p>Ячейки кода выполняются на странице (Pyodide): numpy, scikit-learn, matplotlib, XGBoost и LightGBM без установки.</p>
+      </div>
+      <div class="card">
+        <h3>3. Jupyter-ноутбук</h3>
+        <p>Тот же урок в виде ноутбука с кодом, графиками и упражнениями. Запускается локально в JupyterLab или VS Code.</p>
+      </div>
+      <div class="card">
+        <h3>4. Примеры и данные</h3>
+        <p>Самостоятельные скрипты в <code>examples/</code> и CSV в <code>data/</code>. Любой виджет выгружает свои данные и код кнопками «CSV» и «Python».</p>
+      </div>
+      <div class="card">
+        <h3>5. Проверка себя</h3>
+        <p>Тест в конце урока, упражнения с решениями и отметка «пройдено» — прогресс виден в шапке сайта.</p>
+      </div>
+      <div class="card">
+        <h3>Установка для Jupyter</h3>
+        <p>Из корня курса:</p>
+        <pre><code class="language-bash">python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+jupyter lab</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>«Градиентный бустинг по косточкам» · учебная библиотека <code>gbcourse</code> воспроизводит scikit-learn с точностью до 10<sup>−15</sup> · страницы работают без сервера, но удобнее всего запустить <code>python tools/serve.py</code>.</p>
+  </footer>
+</main>
+<noscript><p class="noscript-note">Для интерактивных примеров нужен JavaScript. Текст курса доступен и без него.</p></noscript>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_4_2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>4.2 Темп обучения и число деревьев</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Темп обучения и число деревьев — два самых важных гиперпараметра бустинга. Их взаимосвязь проста, но её непонимание — самая частая причина плохих моделей.</p>
+  <p>В уроке <a data-lesson="lesson_4_1"></a> с ν = 1 модель за два шага идеально подогнала крайнюю квартиру — на шумных данных такая жадность оборачивается переобучением. Маленький ν лечит это ценой большего числа деревьев.</p>
+</section>
+
+<section id="what">
+  <h2>Shrinkage: принимать лишь долю исправления</h2>
+  <div class="formula">$$F_m(x) = F_{m-1}(x) + \nu \cdot h_m(x), \qquad 0 &lt; \nu \le 1$$</div>
+  <p>Дерево $h_m$ говорит: «в этой области нужно прибавить столько-то». Мы прибавляем лишь долю ν. Оставшуюся часть исправят следующие деревья — уже с учётом других областей и других разбиений.</p>
+  <div class="callout intuition"><p>Представьте, что вы настраиваете звук с помощью десятка ручек. Можно выкрутить первую ручку до упора — и потом компенсировать остальными. А можно поворачивать все ручки понемногу по очереди. Второй путь дольше, но итоговая настройка аккуратнее: ни одна ручка не «перетягивает» звук на себя.</p></div>
+  <div class="bones" data-title="Почему маленький шаг помогает">
+    <details class="bone" open><summary data-go="lesson_1_3">Связь с градиентным спуском</summary><div class="bone-body"><p>ν — длина шага в функциональном градиентном спуске (урок <a data-lesson="lesson_5_1"></a>). Маленький шаг идёт по «гладкой» траектории, большой — прыгает.</p></div></details>
+    <details class="bone"><summary>Много деревьев делят работу</summary><div class="bone-body"><p>Каждая область получает поправки от многих деревьев с разными разбиениями. Итоговая функция усредняет их пороги — становится глаже, меньше зависит от случайностей одного дерева.</p></div></details>
+    <details class="bone"><summary data-go="lesson_1_4">Регуляризация: меньше разброс</summary><div class="bone-body"><p>При фиксированной «сложности пути» (примерно ν·M) маленький ν даёт модель с меньшим разбросом — в духе того, что усреднение даёт бэггингу.</p></div></details>
+    <details class="bone"><summary data-go="lesson_7_1">Цена: нужно больше деревьев и ранняя остановка</summary><div class="bone-body"><p>При ν = 0.01 может понадобиться несколько тысяч деревьев. Их число выбирают по валидации.</p></div></details>
+  </div>
+</section>
+
+<section id="compare">
+  <h2>Кривые валидации для разных темпов</h2>
+  <p>Одни и те же данные, деревья глубины 3, пять темпов. Горизонтальная ось — число деревьев (логарифмическая шкала).</p>
+  <div data-widget="lr-compare"></div>
+  <p>Три наблюдения, которые повторяются почти на любых данных (в среднем по разбиениям — на одном небольшом разбиении шум может их скрыть):</p>
+  <ol>
+    <li>Чем меньше ν, тем правее минимум: нужное число деревьев растёт примерно как $1/\nu$.</li>
+    <li>Чем меньше ν, тем ниже (или не выше) минимум ошибки — до некоторого предела, после которого выигрыш исчезает.</li>
+    <li>С большим ν переобучение наступает быстро и резко; с маленьким — медленно и плавно, поэтому выбрать M проще.</li>
+  </ol>
+</section>
+
+<section id="sandbox">
+  <h2>Песочница: темп и шаги</h2>
+  <p>Сравните ν = 1 и ν = 0.05 при одной и той же итерации m = 10. Затем найдите m, при котором модель с ν = 0.05 выглядит так же, как модель с ν = 1 после 10 шагов.</p>
+  <div data-widget="boosting-1d" data-config='{"dataset": {"kind": "wave", "n": 120, "noise": 0.5, "seed": 7}, "model": {"learningRate": 1, "maxDepth": 3, "nEstimators": 300}, "controls": ["lr", "depth", "M", "noise"], "split": 0.3, "start": 10, "panels": ["model", "curve"]}'></div>
+</section>
+
+<section id="practice">
+  <h2>Практические правила</h2>
+  <div class="callout tip">
+    <ul>
+      <li>Начните с ν = 0.1 и подберите число деревьев ранней остановкой.</li>
+      <li>Для финальной модели уменьшите ν в 2–10 раз и увеличьте M во столько же раз — обычно это даёт небольшой, но стабильный прирост.</li>
+      <li>ν &gt; 0.3 оправдан только для быстрых экспериментов.</li>
+      <li>Никогда не подбирайте M по тестовой выборке — только по валидации или кросс-валидации.</li>
+    </ul>
+  </div>
+  <table>
+    <thead><tr><th>Библиотека</th><th>Параметр</th><th>По умолчанию</th></tr></thead>
+    <tbody>
+      <tr><td>scikit-learn</td><td><code>learning_rate</code>, <code>n_estimators</code></td><td>0.1, 100</td></tr>
+      <tr><td>XGBoost</td><td><code>learning_rate</code> (<code>eta</code>), <code>n_estimators</code></td><td>0.3, 100</td></tr>
+      <tr><td>LightGBM</td><td><code>learning_rate</code>, <code>n_estimators</code></td><td>0.1, 100</td></tr>
+      <tr><td>CatBoost</td><td><code>learning_rate</code>, <code>iterations</code></td><td>подбирается автоматически, 1000</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Лучшая ошибка и нужное число деревьев для разных ν">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, GBRegressor
+
+X, y = datasets.regression_1d(kind="wave", n=300, noise=0.5, seed=7)
+for nu in (1.0, 0.3, 0.1, 0.03):
+    curves = []
+    for seed in range(5):                      # среднее по 5 разбиениям: одно разбиение слишком шумное
+        X_tr, X_val, y_tr, y_val = datasets.train_test_split(X, y, test_size=0.3, seed=seed)
+        m = GBRegressor(n_estimators=round(60 / nu), learning_rate=nu, max_depth=3).fit(X_tr, y_tr, eval_set=(X_val, y_val))
+        curves.append(m.history_["eval"])
+    ev = np.mean(curves, axis=0)
+    best = int(np.argmin(ev))
+    print(f"ν = {nu:4}: лучшая итерация {best:4d}, ν·M* = {nu * best:4.1f}, лучшая ½MSE {ev.min():.4f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Темп ν — доля исправления, которую принимает модель; он же длина шага функционального спуска.</li>
+    <li>Меньше ν → лучше обобщение, но нужно ≈ пропорционально больше деревьев.</li>
+    <li>Число деревьев выбирают по валидации; с маленьким ν кривая плавная и выбор надёжнее.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "При ν = 0.1 лучшее число деревьев 200. Сколько примерно понадобится при ν = 0.02?", "options": ["≈ 40", "≈ 200", "≈ 1000"], "answer": 2, "explain": "Нужное число деревьев растёт примерно как 1/ν: в 5 раз меньше шаг — в 5 раз больше деревьев."},
+    {"q": "Почему с маленьким ν проще выбрать число деревьев?", "options": ["Кривая валидации около минимума плоская, переобучение нарастает медленно", "Модель вообще не переобучается", "Число деревьев не важно"], "answer": 0, "explain": "С большим ν минимум узкий и переобучение резкое."},
+    {"q": "Можно ли выбрать число деревьев по ошибке на обучении?", "options": ["Да, берём минимум", "Нет, она почти всегда убывает с числом деревьев"], "answer": 1, "explain": "Нужна валидация или кросс-валидация."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

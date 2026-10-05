@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_4_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>4.1 Бустинг на остатках вручную</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Лучший способ понять алгоритм — выполнить его руками. Шесть точек, две итерации, все числа круглые — и после этого урока в градиентном бустинге не останется ни одного загадочного шага.</p>
+</section>
+
+<section id="data">
+  <h2>Данные</h2>
+  <p>Шесть квартир: $x$ — площадь в десятках квадратных метров, $y$ — цена в миллионах рублей. Квартира №3 чуть дешевле соседней — так бывает (хуже район или ремонт).</p>
+  <table>
+    <thead><tr><th>№</th><th class="num">$x$</th><th class="num">$y$</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="num">1</td><td class="num">2</td></tr>
+      <tr><td>2</td><td class="num">2</td><td class="num">4</td></tr>
+      <tr><td>3</td><td class="num">3</td><td class="num">3</td></tr>
+      <tr><td>4</td><td class="num">4</td><td class="num">7</td></tr>
+      <tr><td>5</td><td class="num">5</td><td class="num">9</td></tr>
+      <tr><td>6</td><td class="num">6</td><td class="num">11</td></tr>
+    </tbody>
+  </table>
+  <p>Бустинг: квадратичные потери, деревья глубины 1 (пни), темп $\nu = 1$ (потом возьмём $\nu = 0.5$).</p>
+</section>
+
+<section id="by-hand">
+  <h2>Две итерации карандашом</h2>
+  <div class="steps">
+    <section class="step">
+      <h4>Шаг 0. Стартовая константа</h4>
+      <div class="formula">$$F_0 = \bar y = \frac{2 + 4 + 3 + 7 + 9 + 11}{6} = \frac{36}{6} = 6$$</div>
+      <p>Первый прогноз: 6 млн для любой квартиры. Сумма квадратов ошибок: $(-4)^2 + (-2)^2 + (-3)^2 + 1^2 + 3^2 + 5^2 = 64$.</p>
+    </section>
+    <section class="step">
+      <h4>Шаг 1а. Остатки</h4>
+      <div class="formula">$$r^{(1)} = y - F_0 = (2, 4, 3, 7, 9, 11) - 6 = (-4,\ -2,\ -3,\ 1,\ 3,\ 5)$$</div>
+      <p>Слева остатки отрицательны (модель завышает цену маленьких квартир), справа — положительны. Именно эту закономерность и уловит дерево.</p>
+    </section>
+    <section class="step">
+      <h4>Шаг 1б. Пень на остатках</h4>
+      <p>Перебираем пять порогов (урок <a data-lesson="lesson_2_1"></a>) и считаем выигрыш $\frac{n_L n_R}{n}(\bar r_L - \bar r_R)^2$:</p>
+      <table>
+        <thead><tr><th>порог</th><th class="num">$\bar r_L$</th><th class="num">$\bar r_R$</th><th class="num">выигрыш</th></tr></thead>
+        <tbody>
+          <tr><td>1.5</td><td class="num">−4</td><td class="num">0.8</td><td class="num">19.2</td></tr>
+          <tr><td>2.5</td><td class="num">−3</td><td class="num">1.5</td><td class="num">27</td></tr>
+          <tr class="hl"><td>3.5</td><td class="num">−3</td><td class="num">3</td><td class="num">54</td></tr>
+          <tr><td>4.5</td><td class="num">−2</td><td class="num">4</td><td class="num">48</td></tr>
+          <tr><td>5.5</td><td class="num">−1</td><td class="num">5</td><td class="num">30</td></tr>
+        </tbody>
+      </table>
+      <div class="formula">$$h_1(x) = \begin{cases} -3, &amp; x \le 3.5 \\ +3, &amp; x &gt; 3.5 \end{cases}$$</div>
+    </section>
+    <section class="step">
+      <h4>Шаг 1в. Обновление модели</h4>
+      <div class="formula">$$F_1(x) = F_0 + \nu\, h_1(x) = 6 + 1 \cdot (\mp 3) = \begin{cases} 3, &amp; x \le 3.5 \\ 9, &amp; x &gt; 3.5 \end{cases}$$</div>
+      <p>Новые остатки: $r^{(2)} = y - F_1 = (-1,\ 1,\ 0,\ -2,\ 0,\ 2)$. Сумма квадратов упала с 64 до $1 + 1 + 0 + 4 + 0 + 4 = 10$ — ровно на выигрыш 54.</p>
+    </section>
+    <section class="step">
+      <h4>Шаг 2. Второе дерево</h4>
+      <p>Теперь пень ищет закономерность в $r^{(2)} = (-1, 1, 0, -2, 0, 2)$:</p>
+      <table>
+        <thead><tr><th>порог</th><th class="num">$\bar r_L$</th><th class="num">$\bar r_R$</th><th class="num">выигрыш</th></tr></thead>
+        <tbody>
+          <tr><td>1.5</td><td class="num">−1</td><td class="num">0.2</td><td class="num">1.2</td></tr>
+          <tr><td>2.5</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+          <tr><td>3.5</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+          <tr><td>4.5</td><td class="num">−0.5</td><td class="num">1</td><td class="num">3</td></tr>
+          <tr class="hl"><td>5.5</td><td class="num">−0.4</td><td class="num">2</td><td class="num">4.8</td></tr>
+        </tbody>
+      </table>
+      <div class="formula">$$h_2(x) = \begin{cases} -0.4, &amp; x \le 5.5 \\ +2, &amp; x &gt; 5.5 \end{cases} \qquad F_2 = (2.6,\ 2.6,\ 2.6,\ 8.6,\ 8.6,\ 11)$$</div>
+      <p>Сумма квадратов: $10 - 4.8 = 5.2$. Заметьте: порог 3.5 теперь бесполезен (выигрыш 0) — это разбиение уже «использовано» первым деревом.</p>
+    </section>
+    <section class="step">
+      <h4>Что мы увидели</h4>
+      <ul>
+        <li>Каждое дерево уменьшает сумму квадратов ровно на свой выигрыш: $64 \to 10 \to 5.2$.</li>
+        <li>Второе дерево ищет то, чего не нашло первое, — оно работает с <em>остатками</em>, а не с исходными ценами.</li>
+        <li>При $\nu = 1$ модель жадно подгоняется: квартира №6 уже предсказана идеально (остаток 0), и с 6 точками дальнейшие деревья начнут подгонять шум. Поэтому на практике $\nu &lt; 1$ — следующий урок.</li>
+      </ul>
+    </section>
+  </div>
+</section>
+
+<section id="interactive">
+  <h2>Проверьте себя в таблице</h2>
+  <p>Та же процедура в виде таблицы: каждый шаг добавляет два столбца — дерево $h_m$ и новую модель $F_m$. Меняйте темп ν и продолжайте итерации.</p>
+  <div data-widget="manual-boost"></div>
+  <div class="callout practice"><p>Возьмите ν = 0.5 и пересчитайте первую итерацию вручную: $F_1 = 6 + 0.5 \cdot (\mp 3) = 4.5$ или $7.5$. Остатки станут $(-2.5, -0.5, -1.5, -0.5, 1.5, 3.5)$. Какой порог выберет второе дерево? Проверьте в таблице.</p></div>
+</section>
+
+<section id="bones">
+  <h2>Разбор по косточкам</h2>
+  <div class="bones" data-title="Одна итерация по косточкам">
+    <details class="bone" open><summary>Остаток</summary><div class="bone-body">
+      <p>$r_i = y_i - F_{m-1}(x_i)$ — сколько не хватает прогнозу. Знак — направление ошибки, модуль — её размер.</p>
+      <details class="bone"><summary data-go="lesson_5_1">Остаток = антиградиент квадратичных потерь</summary><div class="bone-body"><p>$-\frac{\partial}{\partial F}\tfrac12(y - F)^2 = y - F$. Для других потерь «остаток» заменится антиградиентом.</p></div></details>
+    </div></details>
+    <details class="bone"><summary>Дерево на остатках</summary><div class="bone-body">
+      <details class="bone"><summary data-go="lesson_2_1">Структура: лучший порог по уменьшению суммы квадратов</summary><div class="bone-body"><p>Дерево группирует объекты с похожими остатками.</p></div></details>
+      <details class="bone"><summary data-go="lesson_1_2">Листья: средний остаток</summary><div class="bone-body"><p>Лучшая константа для квадратичной ошибки внутри листа.</p></div></details>
+    </div></details>
+    <details class="bone"><summary data-go="lesson_4_2">Шаг: $F_m = F_{m-1} + \nu h_m$</summary><div class="bone-body"><p>ν = 1 — принять исправление целиком, ν &lt; 1 — лишь долю.</p></div></details>
+    <details class="bone"><summary>Почему ошибка на обучении не растёт</summary><div class="bone-body"><p>Дерево в каждом листе прибавляет средний остаток листа — это оптимальный сдвиг для квадратичной ошибки, и он не может её увеличить (при $0 &lt; \nu \le 2$ ошибка в каждом листе уменьшается).</p></div></details>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Ручной расчёт в gbcourse и scikit-learn">
+<pre><code class="language-python">import numpy as np
+from sklearn.ensemble import GradientBoostingRegressor
+from gbcourse import datasets, GBRegressor
+
+X, y = datasets.toy_regression()
+model = GBRegressor(n_estimators=2, learning_rate=1.0, max_depth=1).fit(X, y)
+print("F0 =", model.init_)
+for m, (tree,) in enumerate(model.trees_, start=1):
+    root = tree.nodes[0]
+    L, R = tree.nodes[root.left], tree.nodes[root.right]
+    print(f"h{m}: x ≤ {root.threshold} → {L.value:+.2f}, иначе {R.value:+.2f}")
+print("F2 =", model.predict(X))
+print("сумма квадратов по итерациям:", [round(2 * len(y) * v, 6) for v in model.history_["train"]])
+
+sk = GradientBoostingRegressor(n_estimators=2, learning_rate=1.0, max_depth=1).fit(X, y)
+print("sklearn F2 =", sk.predict(X))</code></pre>
+  </div>
+  <p>В <code>history_</code> хранятся средние потери $\tfrac12\,\mathrm{MSE}$, поэтому для суммы квадратов умножаем на $2n$.</p>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>$F_0 = 6$, остатки $(-4,-2,-3,1,3,5)$, первый пень $x \le 3.5$: $\mp 3$, сумма квадратов 64 → 10.</li>
+    <li>Второй пень учится на новых остатках $(-1,1,0,-2,0,2)$ и выбирает порог 5.5: сумма квадратов 10 → 5.2.</li>
+    <li>Каждое дерево уменьшает ошибку ровно на свой выигрыш; уже «объяснённые» разбиения больше не выгодны.</li>
+    <li>ν = 1 быстро подгоняет обучающие данные; на практике берут ν &lt; 1.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Чему равен остаток квартиры №4 после первого дерева (ν = 1)?", "options": ["1", "−2", "0"], "answer": 1, "explain": "F₁(4) = 9, y₄ = 7, остаток 7 − 9 = −2."},
+    {"q": "С ν = 0.5 чему равно F₁ для x = 5?", "options": ["9", "7.5", "6"], "answer": 1, "explain": "6 + 0.5·3 = 7.5."},
+    {"q": "Почему второе дерево не выбрало снова порог 3.5?", "options": ["После первого дерева средние остатки слева и справа от 3.5 равны нулю — выигрыш 0", "Порог нельзя использовать дважды", "Случайно"], "answer": 0, "explain": "Первое дерево «забрало» всю разницу между группами x ≤ 3.5 и x > 3.5."},
+    {"q": "Сумма квадратов после второй итерации?", "options": ["5.2", "10", "4.8"], "answer": 0, "explain": "10 − 4.8 = 5.2."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_6_3">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>6.3 Многоклассовая классификация: softmax</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Классов бывает больше двух: категория товара, тип обращения в поддержку, диагноз. Бинарная схема обобщается естественно — логитов становится $K$, а вместо сигмоиды работает softmax.</p>
+</section>
+
+<section id="softmax">
+  <h2>Softmax: K логитов → K вероятностей</h2>
+  <div class="formula">$$p_k(x) = \frac{e^{F_k(x)}}{\sum_{j=1}^{K} e^{F_j(x)}}, \qquad k = 1, \dots, K$$</div>
+  <p>Вероятности положительны и в сумме дают 1. Прибавьте ко всем логитам одно и то же число — вероятности не изменятся. Поэтому логиты определены с точностью до сдвига, и библиотеки часто центрируют их (scikit-learn и <code>gbcourse</code> начинают с $F_{k,0} = \log \pi_k - \overline{\log\pi}$, где $\pi_k$ — доли классов).</p>
+  <div data-widget="softmax-explorer"></div>
+  <div class="callout note"><p>При $K = 2$ softmax сводится к сигмоиде от разности логитов: $p_1 = \sigma(F_1 - F_0)$. Бинарный бустинг — частный случай, в котором хватает одного логита.</p></div>
+</section>
+
+<section id="gradient">
+  <h2>Кросс-энтропия и её градиент</h2>
+  <p>Потери — минус логарифм вероятности правильного класса. Закодируем ответ вектором $y_k = [\,y = k\,]$:</p>
+  <div class="formula">$$L = -\sum_{k} y_k \log p_k = -F_{y} + \log\sum_j e^{F_j}, \qquad \frac{\partial L}{\partial F_k} = p_k - y_k$$</div>
+  <p>Та же форма, что в бинарном случае: для каждого класса псевдо-остаток $y_k - p_k$. Правильный класс тянет свой логит вверх, остальные классы — свои логиты вниз.</p>
+</section>
+
+<section id="algo">
+  <h2>Итерация: K деревьев</h2>
+  <div class="steps">
+    <section class="step">
+      <h4>1. Вероятности</h4>
+      <p>Для каждого объекта из текущих логитов $F_{1}, \dots, F_{K}$ считаем $p_1, \dots, p_K$.</p>
+    </section>
+    <section class="step">
+      <h4>2. K наборов псевдо-остатков</h4>
+      <p>$r_{ik} = y_{ik} - p_{ik}$ для каждого класса $k$ — все по <em>одним и тем же</em> текущим вероятностям.</p>
+    </section>
+    <section class="step">
+      <h4>3. K деревьев</h4>
+      <p>Дерево $h_{mk}$ учится на $r_{\cdot k}$. Значения листьев у Фридмана — шаг Ньютона с диагональным гессианом и множителем $(K-1)/K$:</p>
+      <div class="formula">$$\gamma_{jkm} = \frac{K-1}{K}\cdot\frac{\sum_{i \in R_{jkm}} r_{ik}}{\sum_{i\in R_{jkm}} |r_{ik}|\,(1 - |r_{ik}|)}$$</div>
+      <p>XGBoost использует гессиан $2p_k(1-p_k)$ — похожая поправка.</p>
+    </section>
+    <section class="step">
+      <h4>4. Обновление</h4>
+      <p>$F_k \leftarrow F_k + \nu\, h_{mk}$ для всех $k$. Итерация стоит в $K$ раз дороже бинарной — при 100 классах это существенно.</p>
+    </section>
+  </div>
+  <div data-widget="boosting-2d" data-config='{"dataset": {"kind": "blobs3", "n": 300, "noise": 0.7, "seed": 65}, "model": {"learningRate": 0.2, "maxDepth": 2, "nEstimators": 100}, "controls": ["noise", "lr", "depth", "M"], "start": 10, "title": "Три класса: softmax-бустинг"}'></div>
+  <p>Цвет фона — класс с наибольшей вероятностью, насыщенность — уверенность модели.</p>
+</section>
+
+<section id="alt">
+  <h2>Альтернатива: один против всех</h2>
+  <p>Можно обучить $K$ независимых бинарных классификаторов «класс $k$ против остальных» и нормировать их вероятности. Это проще распараллелить, но вероятности не согласованы (их сумма не 1 без нормировки), а обучение не учитывает конкуренцию классов. Softmax-бустинг — стандарт в XGBoost (<code>multi:softprob</code>), LightGBM (<code>multiclass</code>) и CatBoost (<code>MultiClass</code>).</p>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Три класса: gbcourse и scikit-learn">
+<pre><code class="language-python">import numpy as np
+from sklearn.ensemble import GradientBoostingClassifier
+from gbcourse import datasets, GBClassifier
+
+X, y = datasets.classification_2d(kind="blobs3", n=300, noise=0.7, seed=65)
+ours = GBClassifier(n_estimators=100, learning_rate=0.2, max_depth=2).fit(X, y)
+sk = GradientBoostingClassifier(n_estimators=100, learning_rate=0.2, max_depth=2).fit(X, y)
+print("деревьев в модели:", len(ours.trees_), "итераций ×", len(ours.trees_[0]), "класса")
+print("начальные логиты:", np.round(ours.init_, 4), " (сумма", round(float(np.sum(ours.init_)), 10), ")")
+print("расхождение вероятностей с sklearn:", np.abs(ours.predict_proba(X) - sk.predict_proba(X)).max())</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>K логитов, softmax даёт вероятности; логиты определены с точностью до сдвига.</li>
+    <li>Кросс-энтропия, градиент $p_k - y_k$, псевдо-остатки $y_k - p_k$.</li>
+    <li>На итерации — K деревьев по одним и тем же текущим вероятностям; листья — шаг Ньютона с множителем $(K-1)/K$.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Логиты (1, 1, 1). Вероятности?", "options": ["(1/3, 1/3, 1/3)", "(1, 1, 1)", "(0.73, 0.73, 0.73)"], "answer": 0, "explain": "Все логиты равны — все вероятности равны."},
+    {"q": "Объект класса 2, вероятности (0.2, 0.5, 0.3) для классов 0, 1, 2. Псевдо-остатки?", "options": ["(−0.2, −0.5, 0.7)", "(0.2, 0.5, −0.7)", "(0, 0, 1)"], "answer": 0, "explain": "y_k − p_k: (0 − 0.2, 0 − 0.5, 1 − 0.3)."},
+    {"q": "Сколько деревьев в softmax-бустинге с 10 классами и 200 итерациями?", "options": ["200", "2000", "10"], "answer": 1, "explain": "По дереву на класс в каждой итерации."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

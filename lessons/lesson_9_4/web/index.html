@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_9_4">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>9.4 Сравнение библиотек и выбор</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="results.js,lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">«Какая библиотека лучше?» — самый частый вопрос о бустинге и самый неудачно поставленный. Ответ зависит от данных, от того, настраивали ли параметры, и от того, что важнее: точность, время обучения или простота. Поставим эксперимент честно и посмотрим, что можно утверждать, а что нет.</p>
+</section>
+
+<section id="protocol">
+  <h2>Протокол</h2>
+  <div class="bones" data-title="Честное сравнение по косточкам">
+    <details class="bone" open><summary>Одинаковые данные и разбиения</summary><div class="bone-body"><p>Каждая задача делится на обучение (60%), валидацию (20%) и тест (20%). Разбиения одинаковы для всех библиотек. Повторяем для трёх разбиений и усредняем: разница меньше разброса между разбиениями — не разница.</p></div></details>
+    <details class="bone"><summary>Два режима</summary><div class="bone-body"><p>«По умолчанию» — ничего не трогаем: так библиотеку видит новичок. «Настроено» — темп 0.05, до 5000 деревьев, ранняя остановка по валидации через 100 деревьев без улучшения. Это минимальная разумная настройка. Полный подбор параметров — модуль <a data-lesson="lesson_11"></a>.</p></div></details>
+    <details class="bone"><summary>Тест только в конце</summary><div class="bone-body"><p>Валидация используется для остановки, поэтому качество оценивается на тесте, который ни в чём не участвовал.</p></div></details>
+    <details class="bone"><summary>Три задачи</summary><div class="bone-body"><p>Регрессия Фридмана (5000 × 10, половина признаков — шум); классификация «луны» с 8 шумовыми признаками (20000 × 10); регрессия с категорией из 100 значений с неравными частотами (5000 × 2). Категория передаётся каждой библиотеке её собственным способом.</p></div></details>
+  </div>
+</section>
+
+<section id="results">
+  <h2>Результаты</h2>
+  <p>Числа получены скриптом <code>examples/benchmark.py</code>; он же записывает их для виджета. Время обучения зависит от машины — смотрите на соотношения.</p>
+  <div data-widget="benchmark"></div>
+</section>
+
+<section id="conclusions">
+  <h2>Что можно утверждать</h2>
+  <div class="bones" data-title="Выводы по косточкам">
+    <details class="bone" open><summary>Настройка важнее выбора библиотеки</summary><div class="bone-body"><p>Темп 0.05 с ранней остановкой улучшил XGBoost на всех трёх задачах: RMSE на Фридмане 1.416 → 1.277, log-loss на «лунах» 0.241 → 0.211, RMSE с категорией 1.197 → 1.072. После настройки разница между библиотеками на «лунах» — 0.004 (0.209–0.213), около двух стандартных отклонений между разбиениями.</p></div></details>
+    <details class="bone"><summary>У CatBoost лучшие умолчания — и самое долгое обучение</summary><div class="bone-body"><p>По умолчанию CatBoost лучший на Фридмане (RMSE 1.084 против 1.271 у LightGBM и 1.416 у XGBoost) и на «лунах» (0.212). Отчасти потому, что он строит 1000 деревьев с автоматически подобранным темпом, а не 100. Обучение при этом в 10–60 раз дольше на числовых задачах. С категориальным признаком в нашем окружении — 69 с против 0.05 с: CatBoost 1.2.10 тратил около 60 мс на каждое дерево независимо от числа строк.</p></div></details>
+    <details class="bone"><summary>Задача важнее «рейтинга»</summary><div class="bone-body"><p>На Фридмане CatBoost остался лучшим и после настройки (1.073 против 1.248 и 1.277): его симметричные деревья хорошо подходят к этой почти аддитивной задаче (урок <a data-lesson="lesson_9_3"></a>). С категориальным признаком лучшим оказался LightGBM (1.051), а CatBoost — худшим после настройки (1.086): у категории много редких значений, а на них упорядоченные статистики шумят.</p></div></details>
+  </div>
+</section>
+
+<section id="choice">
+  <h2>Как выбирать</h2>
+  <table>
+    <thead><tr><th>Ситуация</th><th>Разумный старт</th></tr></thead>
+    <tbody>
+      <tr><td>Нет времени на настройку, данные небольшие</td><td>CatBoost с параметрами по умолчанию</td></tr>
+      <tr><td>Большие данные, важна скорость обучения</td><td>LightGBM или XGBoost <code>hist</code>, ранняя остановка</td></tr>
+      <tr><td>Много категорий с частыми значениями</td><td>CatBoost или LightGBM с категориями; сравнить на валидации</td></tr>
+      <tr><td>Категории с множеством редких значений</td><td>сравнить встроенную обработку и кодирование (урок <a data-lesson="lesson_10_1"></a>)</td></tr>
+      <tr><td>Нужны свои функции потерь, продолжение обучения, GPU, распределённое обучение</td><td>все три умеют; XGBoost — самый гибкий нативный API</td></tr>
+      <tr><td>Важна скорость прогноза</td><td>CatBoost (симметричные деревья) или компиляция модели</td></tr>
+    </tbody>
+  </table>
+  <div class="callout note"><p>Главное правило: одинаковые разбиения, отложенный тест, несколько повторов. Одна задача и одно разбиение ничего не доказывают — в этом курсе мы не раз видели, как выводы по одному разбиению переворачивались.</p></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <p>Мини-версия протокола для XGBoost и LightGBM прямо в браузере (CatBoost — в скрипте и ноутбуке урока):</p>
+  <div class="pycell" data-title="Три разбиения, ранняя остановка, отложенный тест">
+<pre><code class="language-python">import numpy as np
+import lightgbm as lgb
+import xgboost as xgb
+from gbcourse import datasets
+
+X, y = datasets.friedman1(n=5000, noise=1.0, seed=120)
+scores = {"XGBoost": [], "LightGBM": []}
+for seed in range(3):
+    perm = np.random.default_rng(seed).permutation(len(y))
+    tr, va, te = perm[:3000], perm[3000:4000], perm[4000:]
+    m = xgb.XGBRegressor(n_estimators=5000, learning_rate=0.05, early_stopping_rounds=100, random_state=seed)
+    m.fit(X[tr], y[tr], eval_set=[(X[va], y[va])], verbose=False)
+    scores["XGBoost"].append(np.sqrt(np.mean((y[te] - m.predict(X[te])) ** 2)))
+    m = lgb.LGBMRegressor(n_estimators=5000, learning_rate=0.05, verbose=-1, random_state=seed)
+    m.fit(X[tr], y[tr], eval_set=[(X[va], y[va])], callbacks=[lgb.early_stopping(100, verbose=False)])
+    scores["LightGBM"].append(np.sqrt(np.mean((y[te] - m.predict(X[te])) ** 2)))
+for name, s in scores.items():
+    print(f"{name:9s} RMSE на тесте {np.mean(s):.3f} ± {np.std(s):.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Сравнивайте по одному протоколу: одинаковые разбиения, отложенный тест, несколько повторов.</li>
+    <li>Минимальная настройка (темп + ранняя остановка) часто важнее выбора библиотеки.</li>
+    <li>У CatBoost сильные умолчания и долгое обучение; LightGBM и XGBoost быстрее.</li>
+    <li>Лучшая библиотека зависит от задачи — проверяйте на своих данных.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Библиотека A: 0.212 ± 0.003, B: 0.210 ± 0.002 (по трём разбиениям). Что можно сказать?", "options": ["B лучше", "разница в пределах разброса — вывода нет", "A лучше"], "answer": 1, "explain": "Разница 0.002 сравнима со стандартным отклонением между разбиениями."},
+    {"q": "Почему в «настроенном» режиме качество оценивают на тесте, а не на валидации?", "options": ["валидация использовалась для ранней остановки", "тест больше", "так быстрее"], "answer": 0, "explain": "По валидации выбрано число деревьев — оценка на ней оптимистична."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

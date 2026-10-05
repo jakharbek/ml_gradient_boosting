@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_3_2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3.2 AdaBoost: бустинг через веса объектов</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">В 1990 году Шапире доказал удивительное: если есть способ хоть чуть-чуть лучше угадывать, чем монетка, из него можно собрать сколь угодно точный классификатор. AdaBoost (Фройнд и Шапире, 1995) — практичный рецепт такой сборки.</p>
+  <p>AdaBoost — прямой предок градиентного бустинга. В уроке <a data-lesson="lesson_3_3"></a> мы увидим, что он минимизирует определённую функцию потерь, и одна замена превращает его в градиентный бустинг.</p>
+</section>
+
+<section id="idea">
+  <h2>Идея: сделать трудные объекты тяжелее</h2>
+  <p>Каждый объект получает вес. Сначала веса равны. Обучаем слабого ученика (пень) по <em>взвешенным</em> данным. Объекты, на которых он ошибся, становятся тяжелее, остальные — легче. Следующий пень вынужден сосредоточиться на трудных объектах. Итог — взвешенное голосование пней.</p>
+  <div data-widget="adaboost-2d"></div>
+</section>
+
+<section id="algo">
+  <h2>Алгоритм по шагам</h2>
+  <p>Метки кодируем как $y_i \in \{-1, +1\}$, ученики выдают $h_m(x) \in \{-1, +1\}$.</p>
+  <div class="steps">
+    <section class="step">
+      <h4>Шаг 0. Равные веса</h4>
+      <div class="formula">$$w_i^{(1)} = \frac1n, \qquad i = 1, \dots, n$$</div>
+    </section>
+    <section class="step">
+      <h4>Шаг 1. Обучить ученика на взвешенных данных</h4>
+      <p>Пень выбирает разбиение с учётом весов: ошибка на тяжёлом объекте стоит дороже. Взвешенная ошибка ученика:</p>
+      <div class="formula">$$\varepsilon_m = \frac{\sum_i w_i\, [h_m(x_i) \ne y_i]}{\sum_i w_i}$$</div>
+      <p>Если $\varepsilon_m \ge 0.5$ — ученик не лучше монетки, алгоритм останавливается.</p>
+    </section>
+    <section class="step">
+      <h4>Шаг 2. Вес ученика</h4>
+      <div class="formula">$$\alpha_m = \frac12 \ln\frac{1 - \varepsilon_m}{\varepsilon_m}$$</div>
+      <p>Точный ученик (малое $\varepsilon$) получает большой голос; ученик-монетка ($\varepsilon = 0.5$) — нулевой. Почему именно логарифм — выводится в уроке <a data-lesson="lesson_3_3"></a>.</p>
+    </section>
+    <section class="step">
+      <h4>Шаг 3. Пересчитать веса объектов</h4>
+      <div class="formula">$$w_i \leftarrow w_i \cdot e^{-\alpha_m y_i h_m(x_i)}, \quad \text{затем нормировать к сумме 1}$$</div>
+      <p>При верном ответе $y_i h_m(x_i) = +1$ — вес умножается на $e^{-\alpha_m} &lt; 1$; при ошибке — на $e^{\alpha_m} &gt; 1$. После пересчёта взвешенная ошибка текущего ученика ровно 0.5: следующий ученик не может его повторить.</p>
+    </section>
+    <section class="step">
+      <h4>Шаг 4. Итоговый классификатор</h4>
+      <div class="formula">$$F_M(x) = \sum_{m=1}^{M} \alpha_m h_m(x), \qquad \hat y = \operatorname{sign} F_M(x)$$</div>
+      <p>Обратите внимание: это <strong>аддитивная модель</strong> — сумма слабых учеников с коэффициентами. Та же форма, что у градиентного бустинга.</p>
+    </section>
+  </div>
+</section>
+
+<section id="theory">
+  <h2>Гарантия и подвох</h2>
+  <p>Если каждый ученик хоть немного лучше монетки, $\varepsilon_m \le \tfrac12 - \gamma$, то доля ошибок на обучении убывает экспоненциально:</p>
+  <div class="formula">$$\frac1n \sum_i [\operatorname{sign} F_M(x_i) \ne y_i] \;\le\; \prod_{m=1}^{M} 2\sqrt{\varepsilon_m(1-\varepsilon_m)} \;\le\; e^{-2\gamma^2 M}$$</div>
+  <div class="callout warning"><p><strong>Подвох — шум в метках.</strong> Объект с неверной меткой все ученики «не угадывают», и его вес растёт экспоненциально. Ансамбль тратит всё больше усилий на подгонку заведомо неправильных точек. Добавьте в виджете шум в метки и посмотрите, как веса концентрируются на нескольких точках. Градиентный бустинг с логистическими потерями к этому устойчивее — урок <a data-lesson="lesson_3_3"></a>.</p></div>
+</section>
+
+<section id="bones">
+  <h2>Разбор по косточкам</h2>
+  <div class="bones" data-title="AdaBoost по косточкам">
+    <details class="bone"><summary>Слабый ученик на взвешенных данных</summary><div class="bone-body">
+      <details class="bone"><summary data-go="lesson_2_2">Взвешенный критерий разбиения</summary><div class="bone-body"><p>В сумме каждый объект учитывается со своим весом: $\sum w_i y_i$ вместо $\sum y_i$, $\sum w_i$ вместо $n$. В <code>gbcourse</code> это дерево с $g_i = -w_i y_i$, $h_i = w_i$.</p></div></details>
+    </div></details>
+    <details class="bone"><summary>Голос ученика $\alpha_m$</summary><div class="bone-body"><p>Логарифм отношения шансов верного ответа. Это оптимальный шаг для экспоненциальных потерь.</p></div></details>
+    <details class="bone"><summary>Обновление весов</summary><div class="bone-body"><p>Вес объекта после $m$ шагов пропорционален $e^{-y_i F_m(x_i)}$ — то есть экспоненциальным потерям на этом объекте. Отсюда связь с функциями потерь.</p></div></details>
+    <details class="bone"><summary>Варианты: SAMME, Real AdaBoost</summary><div class="bone-body"><p>SAMME обобщает AdaBoost на K классов, добавляя к $\alpha$ слагаемое $\ln(K-1)$ (в scikit-learn и без множителя ½). Real AdaBoost использует вероятности вместо меток.</p></div></details>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="AdaBoost вручную и в scikit-learn">
+<pre><code class="language-python">import numpy as np
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+from gbcourse import datasets, AdaBoost
+
+X, y = datasets.classification_2d(kind="circles", n=160, noise=0.15, seed=5)
+ada = AdaBoost(n_estimators=30).fit(X, y)
+for m in range(5):
+    print(f"шаг {m + 1}: ε = {ada.errors_[m]:.3f}, α = {ada.alphas_[m]:.3f}, max вес = {ada.weights_[m + 1].max():.3f}")
+
+sk = AdaBoostClassifier(estimator=DecisionTreeClassifier(max_depth=1), n_estimators=30).fit(X, y)
+print("совпадение прогнозов с sklearn:", (ada.predict(X) == sk.predict(X)).mean())</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>AdaBoost поддерживает веса объектов и увеличивает их там, где ансамбль ошибается.</li>
+    <li>Вес ученика $\alpha_m = \tfrac12\ln\frac{1-\varepsilon_m}{\varepsilon_m}$; итог — $\operatorname{sign}\sum \alpha_m h_m(x)$.</li>
+    <li>Ошибка на обучении убывает экспоненциально, если ученики лучше монетки.</li>
+    <li>Слабое место — шумные метки: их веса взрываются.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Ученик ошибся с взвешенной ошибкой ε = 0.1. Его вес α?", "options": ["½·ln 9 ≈ 1.10", "0.9", "ln 0.1"], "answer": 0, "explain": "α = ½·ln((1 − 0.1)/0.1) = ½·ln 9 ≈ 1.099."},
+    {"q": "Во сколько раз (до нормировки) увеличится вес объекта, на котором ошибся ученик с α = 1.1?", "options": ["в e^{1.1} ≈ 3 раза", "в 1.1 раза", "не изменится"], "answer": 0, "explain": "Вес умножается на e^{−α·y·h} = e^{α} при ошибке."},
+    {"q": "Почему AdaBoost чувствителен к ошибкам в метках?", "options": ["Вес неверно размеченного объекта растёт экспоненциально, и ансамбль подгоняется под него", "Потому что использует пни", "Потому что не использует темп обучения"], "answer": 0, "explain": "Вес ∝ e^{−yF}, а для неправильной метки yF становится всё более отрицательным."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

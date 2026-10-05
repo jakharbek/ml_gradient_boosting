@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_5">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>5. Бустинг как градиентный спуск в пространстве функций</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем этот модуль</h2>
+  <p class="lead">До сих пор деревья учились на остатках $y - F$. Это работает для квадратичных потерь. Но как быть с абсолютными, квантильными, логистическими, своими бизнес-потерями? Ответ Фридмана (2001) сделал бустинг универсальным.</p>
+  <p>В этом модуле слово «градиентный» наконец получает точный смысл. После него вы сможете сами вывести алгоритм бустинга для любой дифференцируемой функции потерь.</p>
+</section>
+
+<section id="idea">
+  <h2>Идея за одну минуту</h2>
+  <div class="compare">
+    <div><h4>Обычный градиентный спуск</h4><p>Параметры $\theta$ — числа. Шаг: $\theta \leftarrow \theta - \eta\,\nabla_\theta L$.</p></div>
+    <div><h4>Градиентный бустинг</h4><p>«Параметры» — сами прогнозы $F(x_1), \dots, F(x_n)$. Шаг: $F \leftarrow F - \nu\, \nabla_F L$, где градиент приближён деревом.</p></div>
+  </div>
+  <p>Для квадратичных потерь $-\partial L / \partial F = y - F$ — остаток. Для других потерь антиградиент другой, и именно его («псевдо-остатки») учит дерево. Всё остальное в алгоритме не меняется.</p>
+  <div class="formula">$$r_{im} = -\left[\frac{\partial L(y_i, F(x_i))}{\partial F(x_i)}\right]_{F = F_{m-1}}, \qquad h_m \approx r_{\cdot m}, \qquad F_m = F_{m-1} + \nu h_m$$</div>
+</section>
+
+<section id="sandbox">
+  <h2>Одна процедура — разные потери</h2>
+  <p>Данные с выбросами (8% точек сдвинуты на ±4…7). Переключайте функцию потерь: с квадратичными модель тянется к выбросам, с абсолютными или Хьюбера — почти не замечает их. Нижняя левая панель показывает псевдо-остатки — у L1 это просто ±1.</p>
+  <div data-widget="boosting-1d" data-config='{"dataset": {"kind": "wave", "n": 120, "noise": 0.3, "seed": 51, "outliers": 0.08}, "model": {"loss": "squared", "learningRate": 0.1, "maxDepth": 2, "nEstimators": 200}, "controls": ["loss", "outliers", "lr", "depth", "M"], "start": 60, "split": 0.3}'></div>
+</section>
+
+<section id="plan">
+  <h2>Модуль по косточкам</h2>
+  <div class="bones" data-title="Градиентный бустинг по косточкам">
+    <details class="bone" open><summary data-go="lesson_5_1">Функциональный градиент и псевдо-остатки</summary><div class="bone-body"><p>Почему прогнозы можно считать параметрами, почему шаг делается деревом, что такое проекция градиента.</p></div></details>
+    <details class="bone"><summary data-go="lesson_5_2">Алгоритм Фридмана построчно</summary><div class="bone-body"><p>Общий алгоритм GBM и TreeBoost: псевдо-остатки для структуры дерева, линейный поиск для значений листьев.</p></div></details>
+    <details class="bone"><summary data-go="lesson_5_3">Функции потерь для регрессии</summary><div class="bone-body"><p>L2, L1, Хьюбер, квантильная: градиенты, значения листьев, устойчивость, предсказательные интервалы.</p></div></details>
+  </div>
+  <div data-sublessons></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Одни данные — разные потери">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, GBRegressor
+
+X, y = datasets.regression_1d(kind="wave", n=300, noise=0.3, seed=51, outliers=0.08)
+X_tr, X_te, y_tr, y_te = datasets.train_test_split(X, y, test_size=0.3, seed=0)
+clean = datasets.true_function("wave", X_te[:, 0])          # «истина» без шума и выбросов
+for loss in ("squared", "absolute", "huber"):
+    m = GBRegressor(loss=loss, huber_delta=1.0, n_estimators=300, learning_rate=0.1, max_depth=2).fit(X_tr, y_tr)
+    print(f"{loss:9s}: MAE до истинной функции {np.mean(np.abs(clean - m.predict(X_te))):.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Бустинг — градиентный спуск, в котором «параметры» — прогнозы модели.</li>
+    <li>Дерево учится на антиградиенте потерь (псевдо-остатках); для L2 это обычные остатки.</li>
+    <li>Сменив потери, мы меняем три вещи: $F_0$, псевдо-остатки и значения листьев.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Чему равны псевдо-остатки для абсолютных потерь |y − F|?", "options": ["y − F", "sign(y − F)", "(y − F)²"], "answer": 1, "explain": "−∂|y − F|/∂F = sign(y − F): только направление ошибки."},
+    {"q": "Что в алгоритме бустинга зависит от функции потерь?", "options": ["F₀", "псевдо-остатки", "значения листьев", "способ поиска разбиений дерева"], "answer": [0, 1, 2], "explain": "Структуру дерева по псевдо-остаткам ищут всегда одним способом — наименьшими квадратами."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

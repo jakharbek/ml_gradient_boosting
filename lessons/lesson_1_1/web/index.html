@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_1_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>1.1 Обучение с учителем</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Градиентный бустинг — метод обучения с учителем. Прежде чем разбирать его, договоримся о словах: что мы даём алгоритму, что получаем и что значит «модель обучилась».</p>
+  <p>Эти понятия будут встречаться в каждом уроке. Если они уже знакомы, пролистайте до виджета — он показывает главную мысль урока: <strong>обучение — это подбор параметров, при которых ошибка минимальна</strong>.</p>
+</section>
+
+<section id="data">
+  <h2>Данные: объекты, признаки, ответы</h2>
+  <p>Пусть мы хотим оценивать стоимость квартир. Каждая строка таблицы — <strong>объект</strong> (квартира). Столбцы — <strong>признаки</strong> (features): площадь, этаж, район. Последний столбец — <strong>целевая переменная</strong> (target) — то, что хотим предсказывать.</p>
+  <table>
+    <thead><tr><th>№</th><th class="num">Площадь, м²</th><th class="num">Этаж</th><th>Район</th><th class="num">Цена, млн ₽</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="num">34</td><td class="num">3</td><td>Центр</td><td class="num">7.9</td></tr>
+      <tr><td>2</td><td class="num">52</td><td class="num">9</td><td>Север</td><td class="num">8.4</td></tr>
+      <tr><td>3</td><td class="num">71</td><td class="num">2</td><td>Центр</td><td class="num">15.2</td></tr>
+      <tr><td>4</td><td class="num">45</td><td class="num">14</td><td>Юг</td><td class="num">6.8</td></tr>
+    </tbody>
+  </table>
+  <div class="formula">$$\text{объект } i:\quad x_i = (x_{i1}, \dots, x_{id}) \in \mathbb{R}^d, \qquad y_i \text{ — ответ}, \qquad \text{выборка } \{(x_i, y_i)\}_{i=1}^{n}$$</div>
+  <p>Здесь $n$ — число объектов, $d$ — число признаков. «С учителем» — потому что для обучающих объектов правильные ответы $y_i$ известны: «учитель» их подсказал.</p>
+  <div class="bones" data-title="Разбор по косточкам: виды задач">
+    <details class="bone"><summary>Регрессия: ответ — число</summary><div class="bone-body">
+      <p>Цена, спрос, температура, время доставки. Ошибка — насколько прогноз далёк от ответа. Бустинг для регрессии разбираем в модулях <a data-lesson="lesson_4">4</a> и <a data-lesson="lesson_5">5</a>.</p>
+    </div></details>
+    <details class="bone"><summary>Классификация: ответ — класс</summary><div class="bone-body">
+      <p>Вернёт ли клиент кредит (да/нет), что на картинке (кошка/собака/птица). Модель обычно выдаёт <em>вероятность</em> каждого класса.</p>
+      <details class="bone"><summary data-go="lesson_6_1">Бинарная: два класса</summary><div class="bone-body"><p>Ответ кодируют числами 0 и 1; модель предсказывает $p = P(y = 1 \mid x)$.</p></div></details>
+      <details class="bone"><summary data-go="lesson_6_3">Многоклассовая: K классов</summary><div class="bone-body"><p>Модель выдаёт K вероятностей, в сумме равных 1.</p></div></details>
+    </div></details>
+    <details class="bone"><summary data-go="lesson_13_1">Ранжирование: ответ — порядок</summary><div class="bone-body">
+      <p>Поисковая выдача, рекомендации: важны не сами числа, а правильный порядок объектов.</p>
+    </div></details>
+    <details class="bone"><summary>Типы признаков</summary><div class="bone-body">
+      <details class="bone"><summary>Числовые</summary><div class="bone-body"><p>Площадь, возраст. Деревьям важен только их порядок — поэтому бустингу не нужно их масштабировать.</p></div></details>
+      <details class="bone"><summary data-go="lesson_10_1">Категориальные</summary><div class="bone-body"><p>Район, марка машины. Их нужно превратить в числа — это отдельное искусство.</p></div></details>
+      <details class="bone"><summary data-go="lesson_10_2">Пропуски</summary><div class="bone-body"><p>Значение неизвестно. Современные библиотеки бустинга умеют обрабатывать их сами.</p></div></details>
+    </div></details>
+  </div>
+</section>
+
+<section id="model">
+  <h2>Модель — это функция с параметрами</h2>
+  <p><strong>Модель</strong> — правило, которое по признакам выдаёт прогноз: $\hat y = F(x)$. Обычно это семейство функций с настраиваемыми числами — <strong>параметрами</strong> $\theta$:</p>
+  <div class="formula">$$\hat y = F(x;\ \theta)$$</div>
+  <div class="compare">
+    <div><h4>Константа</h4><p>$F(x) = c$. Один параметр $c$. Игнорирует признаки — но с неё начинается бустинг.</p></div>
+    <div><h4>Прямая</h4><p>$F(x) = a x + b$. Два параметра. Хороша, если зависимость линейна.</p></div>
+    <div><h4>Ступенька (пень)</h4><p>$F(x) = c_1$ при $x \le t$, иначе $c_2$. Три параметра: порог $t$ и два уровня. Это простейшее дерево решений.</p></div>
+    <div><h4>Бустинг</h4><p>$F(x) = F_0 + \nu \sum_m h_m(x)$ — сумма сотен ступенек. Параметров тысячи, их подбирает алгоритм.</p></div>
+  </div>
+  <div class="callout definition">
+    <p><strong>Параметры</strong> модель подбирает сама при обучении (уровни и пороги деревьев). <strong>Гиперпараметры</strong> задаёт человек до обучения: число деревьев, глубина, темп обучения. Настройке гиперпараметров посвящён модуль <a data-lesson="lesson_11">11</a>.</p>
+  </div>
+</section>
+
+<section id="fit">
+  <h2>Обучение = подбор параметров по ошибке</h2>
+  <p>Как понять, что параметры хорошие? Посчитать, насколько прогнозы отличаются от ответов на обучающих объектах. Самая популярная мера — <strong>среднеквадратичная ошибка</strong> (MSE):</p>
+  <div class="formula">$$\mathrm{MSE}(\theta) = \frac{1}{n} \sum_{i=1}^{n} \big(y_i - F(x_i;\theta)\big)^2$$</div>
+  <p>Попробуйте сами: подберите параметры трёх моделей так, чтобы MSE стала минимальной. Потом нажмите «Найти лучшие параметры» — компьютер решит ту же задачу точно.</p>
+  <div data-widget="manual-fit"></div>
+  <div class="callout intuition">
+    <p>Вы только что сделали то, что делает любой алгоритм машинного обучения: крутили параметры, глядя на ошибку. Алгоритмы делают это автоматически — перебором (как дерево ищет порог, урок <a data-lesson="lesson_2_1"></a>) или спуском по градиенту (урок <a data-lesson="lesson_1_3"></a>).</p>
+  </div>
+  <p>Заметьте: чем гибче модель, тем меньше её лучшая MSE на обучении. Значит ли это, что гибкая модель всегда лучше? Нет — и в этом главный подвох машинного обучения.</p>
+</section>
+
+<section id="test">
+  <h2>Обучение и тест: честная оценка</h2>
+  <p>Нас интересует качество на <em>новых</em> объектах, которых модель не видела. Поэтому данные делят на части:</p>
+  <ul>
+    <li><strong>обучающая выборка</strong> (train) — по ней подбираются параметры;</li>
+    <li><strong>тестовая выборка</strong> (test) — откладывается и используется один раз, в конце, для честной оценки;</li>
+    <li>часто ещё <strong>валидационная</strong> (validation) — для выбора гиперпараметров и ранней остановки.</li>
+  </ul>
+  <div class="callout warning">
+    <p>Ошибка на обучении почти всегда оптимистична. Модель, которая запомнила обучающие ответы, может ошибаться на новых данных сильнее простой константы. Этот эффект — <strong>переобучение</strong> — разбираем в уроке <a data-lesson="lesson_1_4"></a>.</p>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <p>Разделим данные на обучение и тест и сравним три модели: константу, прямую и дерево. Код выполняется в браузере.</p>
+  <div class="pycell" data-title="Три модели, одна метрика">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, RegressionTree
+from gbcourse.metrics import mse
+
+X, y = datasets.regression_1d(kind="wave", n=200, noise=0.4, seed=11)
+X_tr, X_te, y_tr, y_te = datasets.train_test_split(X, y, test_size=0.3, seed=0)
+
+# 1) константа: лучший прогноз без признаков — среднее
+c = y_tr.mean()
+# 2) прямая: метод наименьших квадратов
+a, b = np.polyfit(X_tr[:, 0], y_tr, deg=1)
+# 3) дерево глубины 3 (g = −y, h = 1 → в листьях средние)
+tree = RegressionTree(max_depth=3).fit(X_tr, -y_tr)
+
+for name, pred_tr, pred_te in [
+    ("константа", np.full_like(y_tr, c), np.full_like(y_te, c)),
+    ("прямая", a * X_tr[:, 0] + b, a * X_te[:, 0] + b),
+    ("дерево", tree.predict(X_tr), tree.predict(X_te)),
+]:
+    print(f"{name:10s}  MSE обучение = {mse(y_tr, pred_tr):.3f}   тест = {mse(y_te, pred_te):.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Данные — объекты с признаками $x$ и ответами $y$. Регрессия предсказывает число, классификация — класс.</li>
+    <li>Модель — функция $F(x;\theta)$; параметры $\theta$ подбирает алгоритм, гиперпараметры — человек.</li>
+    <li>Обучить модель = найти параметры, минимизирующие ошибку на обучающих данных.</li>
+    <li>Качество оценивают на отложенных данных: ошибка на обучении оптимистична.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Прогнозируем, сколько минут займёт доставка заказа. Это…", "options": ["регрессия", "бинарная классификация", "ранжирование"], "answer": 0, "explain": "Ответ — число (минуты), значит регрессия."},
+    {"q": "Что из этого — гиперпараметры градиентного бустинга?", "options": ["число деревьев", "пороги разбиений в деревьях", "темп обучения", "значения в листьях"], "answer": [0, 2], "explain": "Число деревьев и темп задаёт человек до обучения. Пороги и значения листьев алгоритм подбирает сам — это параметры."},
+    {"q": "Лучшая константная модель по MSE — это…", "options": ["медиана y", "среднее y", "максимум y"], "answer": 1, "explain": "Среднее минимизирует сумму квадратов отклонений. Почему — докажем в уроке 1.2."},
+    {"q": "Модель A: MSE на обучении 0.1, на тесте 2.5. Модель B: 0.8 и 0.9. Какую выбрать?", "options": ["A — у неё меньше ошибка на обучении", "B — у неё меньше ошибка на новых данных", "Нельзя сказать"], "answer": 1, "explain": "Нас интересует качество на новых данных. A переобучилась: запомнила обучающую выборку."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

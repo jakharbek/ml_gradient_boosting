@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_4">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>4. Градиентный бустинг для регрессии</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем этот модуль</h2>
+  <p class="lead">Все кирпичики собраны: функции потерь, деревья, идея последовательного исправления ошибок. Пора сложить из них градиентный бустинг — сначала в самом простом виде, для регрессии с квадратичными потерями.</p>
+  <p>В этой форме «градиентная» часть ещё не видна: антиградиент квадратичных потерь — это просто остаток $y - F$. Поэтому алгоритм читается как здравый смысл: «посмотри, где ошибся, и исправь немного». Обобщение на любые потери — в модуле <a data-lesson="lesson_5">5</a>.</p>
+</section>
+
+<section id="algo">
+  <h2>Алгоритм в четыре строки</h2>
+  <div class="formula">$$\begin{aligned}
+  &amp;1.\quad F_0(x) = \bar y \\
+  &amp;2.\quad \text{для } m = 1, \dots, M: \\
+  &amp;\qquad r_{i} = y_i - F_{m-1}(x_i) \qquad \text{(остатки)}\\
+  &amp;\qquad h_m = \text{дерево, обученное на } \{(x_i, r_i)\} \\
+  &amp;\qquad F_m(x) = F_{m-1}(x) + \nu\, h_m(x)
+  \end{aligned}$$</div>
+  <div class="bones" data-title="Алгоритм по косточкам">
+    <details class="bone" open><summary data-go="lesson_1_2">$F_0 = \bar y$ — лучшая константа для квадратичных потерь</summary><div class="bone-body"><p>Без признаков лучше среднего не угадать. Всё дальнейшее — поправки к нему.</p></div></details>
+    <details class="bone"><summary data-go="lesson_4_1">$r_i = y_i - F_{m-1}(x_i)$ — что ещё не объяснено</summary><div class="bone-body"><p>Остатки — «работа», оставшаяся после $m-1$ деревьев. Каждый шаг уменьшает их.</p></div></details>
+    <details class="bone"><summary data-go="lesson_2_3">$h_m$ — неглубокое дерево на остатках</summary><div class="bone-body"><p>Дерево находит, в каких областях признаков остатки систематически положительны или отрицательны, и выдаёт в каждом листе средний остаток.</p></div></details>
+    <details class="bone"><summary data-go="lesson_4_2">$\nu$ — принимаем лишь долю исправления</summary><div class="bone-body"><p>Маленькие шаги медленнее, но обобщают лучше: ни одно дерево не успевает «перетянуть» модель под шум.</p></div></details>
+    <details class="bone"><summary data-go="lesson_7_1">$M$ — сколько шагов делать</summary><div class="bone-body"><p>Слишком много деревьев — переобучение. Число выбирают по валидации.</p></div></details>
+  </div>
+</section>
+
+<section id="sandbox">
+  <h2>Песочница</h2>
+  <p>Главный инструмент модуля. Ползунок «Итерация m» показывает модель после $m$ деревьев; нижние графики — остатки, на которых учится $m$-е дерево, и кривые потерь на обучении и валидации (30% точек отложены, полые кружки).</p>
+  <div data-widget="boosting-1d" data-config='{"dataset": {"kind": "wave", "n": 100, "noise": 0.35, "seed": 42}, "model": {"learningRate": 0.1, "maxDepth": 2, "nEstimators": 150}, "controls": ["dataset", "noise", "n", "lr", "depth", "minleaf", "M"], "split": 0.3, "start": 1}'></div>
+  <p>Вопросы для самопроверки, на которые отвечает песочница:</p>
+  <ul>
+    <li>Почему первое дерево почти повторяет форму данных, а сотое — «плоское» и мелкое?</li>
+    <li>При каких ν и глубине кривая валидации начинает расти? Что это значит?</li>
+    <li>Что происходит на данных «Ступеньки» с деревьями глубины 1?</li>
+  </ul>
+</section>
+
+<section id="plan">
+  <h2>Уроки модуля</h2>
+  <div data-sublessons></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Алгоритм в 10 строк — и сверка с scikit-learn">
+<pre><code class="language-python">import numpy as np
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import GradientBoostingRegressor
+from gbcourse import datasets
+
+X, y = datasets.regression_1d(kind="wave", n=100, noise=0.35, seed=42)
+nu, M = 0.1, 150
+F = np.full_like(y, y.mean())            # 1. F0 = среднее
+trees = []
+for m in range(M):
+    r = y - F                            # 2. остатки
+    h = DecisionTreeRegressor(max_depth=2).fit(X, r)   # 3. дерево на остатках
+    F = F + nu * h.predict(X)            # 4. маленький шаг
+    trees.append(h)
+
+sk = GradientBoostingRegressor(n_estimators=M, learning_rate=nu, max_depth=2).fit(X, y)
+print("расхождение с sklearn:", np.abs(F - sk.predict(X)).max())</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Бустинг с L2: старт со среднего, затем деревья на остатках с маленьким шагом ν.</li>
+    <li>Каждое дерево исправляет то, что не объяснили предыдущие.</li>
+    <li>Качество управляется темпом ν, числом деревьев M и сложностью деревьев.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Чему учится третье дерево бустинга с квадратичными потерями?", "options": ["Предсказывать y", "Предсказывать y − F₂(x)", "Предсказывать y − F₀(x)"], "answer": 1, "explain": "Остатки считаются относительно текущей модели после двух деревьев."},
+    {"q": "Почему поздние деревья «плоские» (маленькие значения в листьях)?", "options": ["Остатки к этому моменту малы — исправлять почти нечего", "Деревья становятся глубже", "Темп обучения растёт"], "answer": 0, "explain": "Модель уже объяснила основную структуру; остатки близки к шуму."},
+    {"q": "Что вернёт бустинг с M = 0?", "options": ["Ноль", "Среднее y для любого x", "Случайное число"], "answer": 1, "explain": "F₀ = ȳ."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

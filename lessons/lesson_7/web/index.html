@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_7">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>7. Регуляризация градиентного бустинга</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем этот модуль</h2>
+  <p class="lead">Бустинг последовательно уменьшает смещение — и если его не остановить, начинает подгоняться под шум. Почти все гиперпараметры библиотек бустинга — это способы сдержать эту жадность.</p>
+</section>
+
+<section id="map">
+  <h2>Карта рычагов</h2>
+  <div class="bones" data-title="Регуляризация бустинга по косточкам">
+    <details class="bone" open><summary>Сколько и какими шагами идти</summary><div class="bone-body">
+      <details class="bone"><summary data-go="lesson_4_2">Темп ν (learning_rate)</summary><div class="bone-body"><p>Маленькие шаги — меньше разброс, нужно больше деревьев.</p></div></details>
+      <details class="bone"><summary data-go="lesson_7_1">Число деревьев и ранняя остановка</summary><div class="bone-body"><p>Остановиться там, где ошибка на валидации минимальна.</p></div></details>
+    </div></details>
+    <details class="bone"><summary data-go="lesson_7_2">Случайность: подвыборки</summary><div class="bone-body">
+      <p><code>subsample</code> — доля строк на дерево; <code>colsample_*</code> — доля признаков. Деревья разнообразнее, каждое видит меньше шума.</p>
+    </div></details>
+    <details class="bone"><summary data-go="lesson_7_3">Сложность каждого дерева</summary><div class="bone-body">
+      <p>Глубина, число листьев, минимум объектов/гессианов в листе, минимальный выигрыш γ.</p>
+    </div></details>
+    <details class="bone"><summary data-go="lesson_7_3">Штрафы на значения листьев</summary><div class="bone-body">
+      <p>L2 (λ) и L1 (α) на веса листьев: $w = -G/(H + \lambda)$ — лист с малым числом объектов «сжимается» к нулю.</p>
+    </div></details>
+  </div>
+</section>
+
+<section id="sandbox">
+  <h2>Песочница: все рычаги сразу</h2>
+  <p>Шумные данные, 30% — валидация. Начните со «свободной» модели (ν = 1, глубина 6) и по очереди включайте рычаги: как меняется лучшая ошибка на валидации и форма кривой?</p>
+  <div data-widget="boosting-1d" data-config='{"dataset": {"kind": "wave", "n": 150, "noise": 0.6, "seed": 71}, "model": {"learningRate": 1, "maxDepth": 6, "nEstimators": 200}, "controls": ["lr", "depth", "minleaf", "subsample", "lambda", "M"], "split": 0.3, "start": 200, "panels": ["model", "curve"]}'></div>
+</section>
+
+<section id="plan">
+  <h2>Уроки модуля</h2>
+  <div data-sublessons></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Свободная модель против регуляризованной">
+<pre><code class="language-python">from gbcourse import datasets, GBRegressor
+
+X, y = datasets.regression_1d(kind="wave", n=400, noise=0.6, seed=71)
+X_tr, X_val, y_tr, y_val = datasets.train_test_split(X, y, test_size=0.3, seed=0)
+configs = {
+    "свободная (ν=1, глубина 6)": dict(learning_rate=1.0, max_depth=6),
+    "+ маленький темп": dict(learning_rate=0.05, max_depth=6),
+    "+ неглубокие деревья": dict(learning_rate=0.05, max_depth=2),
+    "+ подвыборка 0.5": dict(learning_rate=0.05, max_depth=2, subsample=0.5, seed=1),
+    "+ min_samples_leaf 10": dict(learning_rate=0.05, max_depth=2, subsample=0.5, seed=1, min_samples_leaf=10),
+}
+for name, kw in configs.items():
+    m = GBRegressor(n_estimators=400, **kw).fit(X_tr, y_tr, eval_set=(X_val, y_val))
+    print(f"{name:28s} лучшая ½MSE {min(m.history_['eval']):.4f} на итерации {m.best_iteration_}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Регуляризация бустинга — это набор рычагов, сдерживающих разброс ценой смещения.</li>
+    <li>Главные: маленький темп + ранняя остановка; затем сложность деревьев, подвыборки и штрафы.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Какие рычаги уменьшают разброс бустинга?", "options": ["меньше ν", "больше max_depth", "subsample < 1", "больше reg_lambda"], "answer": [0, 2, 3], "explain": "Большая глубина, наоборот, делает каждое дерево гибче."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

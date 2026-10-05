@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_7_2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>7.2 Стохастический бустинг</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Через год после статьи о градиентном бустинге Фридман заметил: если каждое дерево обучать на случайной половине данных, модель часто становится <em>точнее</em> — и вдвое быстрее. Так появился стохастический градиентный бустинг, а параметры <code>subsample</code> и <code>colsample_*</code> вошли во все библиотеки.</p>
+</section>
+
+<section id="how">
+  <h2>Как это устроено</h2>
+  <div class="formula">$$\text{на итерации } m:\quad S_m \subset \{1..n\},\ |S_m| = \lfloor s \cdot n \rfloor \text{ (без возвращения)};\quad h_m = \text{дерево на } \{(x_i, r_{im}) : i \in S_m\}$$</div>
+  <p>Псевдо-остатки считаются для всех, но дерево видит только объекты из $S_m$ — и значения листьев тоже считаются по ним. Прогноз обновляется для всех объектов.</p>
+  <div class="bones" data-title="Подвыборки по косточкам">
+    <details class="bone" open><summary>Строки: <code>subsample</code></summary><div class="bone-body"><p>Доля объектов на дерево, без возвращения (в отличие от бутстрэпа в бэггинге). Типичные значения 0.5–0.9.</p></div></details>
+    <details class="bone"><summary>Признаки: <code>colsample_bytree</code>, <code>colsample_bylevel</code>, <code>colsample_bynode</code></summary><div class="bone-body"><p>Доля признаков на дерево, на уровень или на каждый узел (как в случайном лесе). Часто помогает при сотнях коррелированных признаков и ускоряет обучение. Но это не правило: на задаче Фридмана из ноутбука подвыборка признаков качество не улучшает — проверяйте по валидации.</p></div></details>
+    <details class="bone"><summary>Почему помогает</summary><div class="bone-body">
+      <details class="bone"><summary data-go="lesson_3_1">Декорреляция деревьев</summary><div class="bone-body"><p>Деревья разнообразнее, их ошибки меньше коррелируют — эффект, знакомый по случайному лесу.</p></div></details>
+      <details class="bone"><summary>Шум против подгонки</summary><div class="bone-body"><p>Ни одно дерево не видит все обучающие объекты и не может точно подогнаться под шум конкретных точек.</p></div></details>
+      <details class="bone"><summary>Скорость</summary><div class="bone-body"><p>Дерево строится на доле $s$ данных — время итерации падает почти пропорционально.</p></div></details>
+    </div></details>
+    <details class="bone"><summary>Когда вредит</summary><div class="bone-body"><p>С большим темпом (ν ≈ 1) случайность лишь добавляет шума в крупные шаги — модель скачет. Размер данных влияет неочевидно: на маленьких шумных данных регуляризация особенно ценна, и даже подвыборка 0.2 может помочь, а на больших — слишком маленькая подвыборка уже немного вредит (упражнение урока). Фридман рекомендовал сочетать subsample ≈ 0.5 с маленьким ν.</p></div></details>
+  </div>
+</section>
+
+<section id="compare">
+  <h2>Подвыборка на практике</h2>
+  <div data-widget="subsample-compare"></div>
+  <div class="callout note"><p>В обзоре модуля <a data-lesson="lesson_7"></a> подвыборка 0.5 при ν = 1 <em>ухудшила</em> качество, а вместе с маленьким темпом — улучшила. Это не противоречие, а правило: стохастичность — «тонкий» инструмент, который работает поверх маленьких шагов.</p></div>
+</section>
+
+<section id="api">
+  <h2>Параметры в библиотеках</h2>
+  <table>
+    <thead><tr><th>Смысл</th><th>scikit-learn</th><th>XGBoost</th><th>LightGBM</th><th>CatBoost</th></tr></thead>
+    <tbody>
+      <tr><td>доля строк</td><td><code>subsample</code></td><td><code>subsample</code></td><td><code>bagging_fraction</code> + <code>bagging_freq</code></td><td><code>subsample</code> (+ <code>bootstrap_type</code>)</td></tr>
+      <tr><td>доля признаков на дерево</td><td>—</td><td><code>colsample_bytree</code></td><td><code>feature_fraction</code></td><td><code>rsm</code></td></tr>
+      <tr><td>доля признаков на узел</td><td><code>max_features</code></td><td><code>colsample_bynode</code></td><td><code>feature_fraction_bynode</code></td><td>—</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warning"><p>В LightGBM <code>bagging_fraction</code> не работает без <code>bagging_freq &gt; 0</code> — частая ловушка. А <code>subsample</code> в sklearn-обёртке LightGBM — это псевдоним <code>bagging_fraction</code>, и он тоже требует <code>subsample_freq</code>.</p></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="subsample и colsample на задаче Фридмана">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, GBRegressor
+
+X, y = datasets.friedman1(n=400, noise=1.0, seed=74)
+configs = {"без подвыборок": {}, "subsample 0.5": dict(subsample=0.5), "colsample 0.5": dict(colsample=0.5),
+           "оба 0.5": dict(subsample=0.5, colsample=0.5)}
+for name, kw in configs.items():
+    best = []
+    for split in range(3):
+        X_tr, X_val, y_tr, y_val = datasets.train_test_split(X, y, test_size=0.3, seed=split)
+        m = GBRegressor(n_estimators=300, learning_rate=0.1, max_depth=3, seed=1, **kw).fit(X_tr, y_tr, eval_set=(X_val, y_val))
+        best.append(min(m.history_["eval"]))
+    print(f"{name:15s}: лучшая ½MSE {np.mean(best):.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Стохастический бустинг обучает каждое дерево на случайной доле строк (и/или признаков).</li>
+    <li>Это декоррелирует деревья, мешает подгонке под шум и ускоряет обучение.</li>
+    <li>Работает в паре с маленьким темпом; при ν ≈ 1 может вредить.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Чем subsample в бустинге отличается от бутстрэпа в бэггинге?", "options": ["Выборка без возвращения и меньшего размера", "Ничем", "Выбираются признаки, а не объекты"], "answer": 0, "explain": "Фридман брал долю объектов без повторов."},
+    {"q": "В LightGBM задали bagging_fraction=0.5, но скорость не изменилась. Почему?", "options": ["Не задан bagging_freq > 0", "LightGBM не поддерживает подвыборку", "Нужно уменьшить num_leaves"], "answer": 0, "explain": "Без bagging_freq бэггинг выключен."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

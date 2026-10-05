@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_11_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>11.1 Карта гиперпараметров и стратегия настройки</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="results.js,lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Чтобы не тратить часы на параметры, которые ничего не меняют, нужно знать, какие из них влияют на качество. Проверим это прямо: будем менять по одному параметру LightGBM вокруг значений по умолчанию и смотреть, насколько меняется ошибка — и превышает ли это изменение случайный разброс.</p>
+</section>
+
+<section id="sensitivity">
+  <h2>Анализ чувствительности</h2>
+  <p>Две задачи: регрессия Фридмана (4000 × 10) и «луны» с 8 шумовыми признаками (10 000 × 10). Для каждого значения — ранняя остановка по валидации и три повтора с разными разбиениями. Скрипт — <code>examples/sensitivity.py</code>.</p>
+  <div data-widget="sensitivity"></div>
+  <div class="bones" data-title="Что показал анализ">
+    <details class="bone" open><summary>Размер деревьев — главный рычаг</summary><div class="bone-body"><p>На Фридмане <code>num_leaves = 4</code> вместо 31 улучшил RMSE с 1.252 до 1.136 (−9%) — больше всех остальных параметров. На «лунах» лучшим оказалось 8 листьев, но выигрыш (0.2264 → 0.2219) меньше разброса между разбиениями (±0.009).</p></div></details>
+    <details class="bone"><summary>Доля признаков может сильно навредить</summary><div class="bone-body"><p><code>colsample_bytree = 0.3</code> на Фридмане — RMSE 1.668. Дерево видит только 3 признака из 10, и два признака из взаимодействия $x_0 x_1$ редко попадают в одно дерево вместе. Умеренная доля 0.7 чуть помогла (1.220).</p></div></details>
+    <details class="bone"><summary>Остальное — в пределах шума</summary><div class="bone-body"><p>Подвыборка строк, L2-штраф, <code>min_child_samples</code> и <code>max_bin</code> от 63 и выше меняли ошибку меньше чем на стандартное отклонение между разбиениями. Исключения — крайние значения: <code>max_bin = 15</code> (1.316 на Фридмане) и темп 0.3 (1.349).</p></div></details>
+    <details class="bone"><summary>Задача важнее рецепта</summary><div class="bone-body"><p>На «лунах» значения по умолчанию почти оптимальны: ни один параметр не дал улучшения больше шума. Бывают задачи, где настройка почти ничего не даёт, — и полезно узнать это до того, как потратить на неё неделю.</p></div></details>
+  </div>
+  <div class="callout warn"><p>Анализ «по одному параметру» не видит взаимодействий: лучший темп зависит от размера деревьев, лучшая доля признаков — от структуры задачи. Он показывает, <b>куда смотреть</b>, а совместный подбор — задача урока <a data-lesson="lesson_11_2"></a>.</p></div>
+</section>
+
+<section id="strategy">
+  <h2>Пошаговая стратегия</h2>
+  <ol>
+    <li><b>Основа.</b> Темп 0.1, ранняя остановка по валидации — число деревьев подберётся само. Если данных мало, используйте кросс-валидацию.</li>
+    <li><b>Сложность деревьев.</b> <code>num_leaves</code> (или <code>max_depth</code>) и <code>min_child_samples</code>. Это главный рычаг: пробуйте широкий диапазон — от 4 до 128 листьев.</li>
+    <li><b>Случайность.</b> <code>colsample_bytree</code> 0.5–1.0, <code>subsample</code> 0.5–1.0 (с <code>subsample_freq = 1</code>).</li>
+    <li><b>Штрафы.</b> <code>reg_lambda</code>, <code>min_split_gain</code> — обычно небольшой эффект, пробуйте на логарифмической шкале.</li>
+    <li><b>Финал.</b> Темп 0.02–0.05 с ранней остановкой. Обычно это даёт немного качества ценой времени, но не всегда: на «лунах» в упражнении 1 валидация стала чуть хуже. Как и любой шаг, проверяйте его на валидации.</li>
+    <li><b>Проверка.</b> Один раз — на отложенном тесте, который не участвовал ни в одном выборе.</li>
+  </ol>
+  <p>В ноутбуке урока эта стратегия на задаче Фридмана проходится шаг за шагом, с ошибкой на тесте после каждого шага.</p>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Шаг 2 стратегии: перебор сложности деревьев">
+<pre><code class="language-python">import numpy as np
+import lightgbm as lgb
+from gbcourse import datasets
+
+X, y = datasets.friedman1(n=4000, noise=1.0, seed=170)
+perm = np.random.default_rng(0).permutation(len(y))
+tr, va = perm[:2400], perm[2400:3200]
+results = []
+for leaves in (4, 8, 16, 31):
+    for mcs in (5, 20, 100):
+        m = lgb.LGBMRegressor(n_estimators=5000, learning_rate=0.1, num_leaves=leaves, min_child_samples=mcs, verbose=-1)
+        m.fit(X[tr], y[tr], eval_set=[(X[va], y[va])], callbacks=[lgb.early_stopping(100, verbose=False)])
+        results.append((np.sqrt(min(m.evals_result_["valid_0"]["l2"])), leaves, mcs))
+for rmse, leaves, mcs in sorted(results)[:4]:
+    print(f"листьев {leaves:3d}, min_child_samples {mcs:3d}: RMSE {rmse:.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Сравнивайте эффект параметра с разбросом между разбиениями — многие «улучшения» оказываются шумом.</li>
+    <li>Главный рычаг — размер деревьев; доля признаков и крайние значения других параметров могут навредить.</li>
+    <li>Порядок: основа с ранней остановкой → сложность деревьев → случайность → штрафы → меньший темп → один взгляд на тест.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Параметр улучшил ошибку с 0.2264 до 0.2251, стандартное отклонение между разбиениями 0.0095. Вывод?", "options": ["параметр важен", "разница в пределах шума, вывода нет", "параметр вреден"], "answer": 1, "explain": "Разница 0.0013 намного меньше разброса 0.0095."},
+    {"q": "Почему маленькая доля признаков (0.3) навредила на задаче Фридмана?", "options": ["из-за переобучения", "признаки взаимодействия x₀ и x₁ редко попадают в одно дерево", "из-за маленького темпа"], "answer": 1, "explain": "Взаимодействие можно выразить, только если оба признака доступны дереву."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

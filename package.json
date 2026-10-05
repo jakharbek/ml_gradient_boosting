@@ -1,0 +1,11 @@
+{
+  "name": "gradient-boosting-bone-by-bone",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Интерактивный курс «Градиентный бустинг по косточкам» — тесты веб-движка",
+  "scripts": {
+    "test": "node --test \"tests/js/*.test.js\"",
+    "parity": "node tests/parity/run_js.js"
+  },
+  "license": "MIT"
+}

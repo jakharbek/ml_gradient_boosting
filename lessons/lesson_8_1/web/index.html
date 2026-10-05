@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_8_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>8.1 Разложение Тейлора: градиент и гессиан</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">На каждой итерации бустинг решает одну и ту же задачу: насколько сдвинуть прогноз $F_i$ объекта, чтобы уменьшить потери $L(y_i, F_i + w)$. Для квадратичной потери это просто, для остальных — нет. XGBoost делает все потери «квадратичными»: заменяет каждую её параболой в окрестности текущего прогноза.</p>
+</section>
+
+<section id="taylor">
+  <h2>Три приближения</h2>
+  <p>Зафиксируем объект: $y$ известен, текущий прогноз $F$. Как функция от шага $w$:</p>
+  <div class="formula">$$L(y, F + w) \approx \underbrace{L(y, F)}_{\text{0-й порядок}} + \underbrace{g\,w}_{\text{1-й}} + \underbrace{\tfrac12 h\,w^2}_{\text{2-й}}, \qquad g = \frac{\partial L}{\partial F},\quad h = \frac{\partial^2 L}{\partial F^2}.$$</div>
+  <ul>
+    <li><b>Первый порядок</b> — касательная прямая. Она говорит, куда идти ($-g$), но не говорит, <b>сколько</b>: у прямой нет минимума.</li>
+    <li><b>Второй порядок</b> — парабола. При $h &gt; 0$ у неё есть минимум $w^* = -g/h$ — это шаг Ньютона.</li>
+  </ul>
+  <div data-widget="taylor-loss"></div>
+</section>
+
+<section id="table">
+  <h2>g и h для основных потерь</h2>
+  <p>Везде $F$ — «сырой» прогноз модели (для классификации — логит, для Пуассона — логарифм среднего).</p>
+  <table>
+    <thead><tr><th>Потери</th><th>$L(y, F)$</th><th>$g$</th><th>$h$</th><th>XGBoost</th></tr></thead>
+    <tbody>
+      <tr><td>Квадратичная</td><td>$\frac12 (y - F)^2$</td><td>$F - y$</td><td>$1$</td><td><code>reg:squarederror</code></td></tr>
+      <tr><td>Логистическая</td><td>$-y\log p - (1-y)\log(1-p)$, $p = \sigma(F)$</td><td>$p - y$</td><td>$p(1-p)$</td><td><code>binary:logistic</code></td></tr>
+      <tr><td>Пуассон</td><td>$e^F - yF$</td><td>$e^F - y$</td><td>$e^F$</td><td><code>count:poisson</code></td></tr>
+      <tr><td>Псевдо-Хьюбер</td><td>$\delta^2\big(\sqrt{1 + (r/\delta)^2} - 1\big)$, $r = F - y$</td><td>$\dfrac{r}{\sqrt{1+(r/\delta)^2}}$</td><td>$\big(1+(r/\delta)^2\big)^{-3/2}$</td><td><code>reg:pseudohubererror</code></td></tr>
+      <tr><td>Абсолютная</td><td>$|y - F|$</td><td>$\operatorname{sign}(F - y)$</td><td>$0$</td><td><code>reg:absoluteerror</code></td></tr>
+    </tbody>
+  </table>
+  <div class="bones" data-title="Трудные случаи по косточкам">
+    <details class="bone" open><summary>h = 0: абсолютная и квантильная потери</summary><div class="bone-body"><p>Параболы нет — есть только касательная, шаг Ньютона не определён. Библиотеки строят структуру дерева по суррогату (XGBoost для <code>reg:absoluteerror</code> берёт $h = 1$), а затем пересчитывают значения листьев точно: медиана или квантиль остатков в листе. То есть возвращаются к линейному поиску Фридмана из урока <a data-lesson="lesson_5_2"></a>.</p></div></details>
+    <details class="bone"><summary>h скачет: потери Хьюбера</summary><div class="bone-body"><p>У Хьюбера $h = 1$ внутри $|r| \le \delta$ и $h = 0$ снаружи: у выбросов «кривизны» нет совсем. Псевдо-Хьюбер — гладкая версия: $h$ убывает плавно, и формулы второго порядка работают везде.</p></div></details>
+    <details class="bone"><summary>h очень мал: уверенные прогнозы и Пуассон</summary><div class="bone-body"><p>При $h \to 0$ шаг $-g/h$ может стать огромным. Страховки — штраф λ в знаменателе и <code>max_delta_step</code> в XGBoost, который обрезает значение листа. Для <code>count:poisson</code> XGBoost по умолчанию ставит <code>max_delta_step=0.7</code>.</p></div></details>
+  </div>
+</section>
+
+<section id="units">
+  <h2>Зачем нужен h: единицы измерения шага</h2>
+  <p>Если выбросить второй порядок, лист получит значение $-G/n$ — средний антиградиент. Но у градиента те же единицы, что у $y$, а прогноз $F$ может жить в другой шкале. Для Пуассона $F = \log\mu$, и $g = \mu - y$ измеряется в «штуках». При среднем 50 шаг в 10 «штук» по логарифму — это катастрофа. Гессиан $h = \mu$ как раз переводит шаг в нужную шкалу: $-g/h = (y - \mu)/\mu$ — относительная ошибка.</p>
+  <div data-widget="step-units"></div>
+  <p>При ν = 0.3 Ньютон приходит к девиации 0.53–0.73 при любом масштабе от 0.5 до 50. Первый порядок хорош при $s \le 2$, при $s = 5$ девиация вырастает до 80, при $s = 10$ — до 1355, а при $s = 50$ он расходится на второй итерации. Уменьшив ν до 0.03, первый порядок можно спасти при $s = 10$, но тогда он слишком медленный при малых $s$. Для первого порядка правильный темп зависит от масштаба $y$, для Ньютона — нет. (Классический GBM Фридмана решает ту же проблему иначе — линейным поиском в каждом листе.)</p>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Проверяем g и h численно">
+<pre><code class="language-python">import numpy as np
+from gbcourse.losses import get_loss
+
+y, F, eps = np.array([3.0]), np.array([0.7]), 1e-4
+for name in ["squared", "logistic", "poisson", "huber"]:
+    loss = get_loss(name)
+    yy = np.array([1.0]) if name == "logistic" else y
+    L = lambda f: loss.pointwise(yy, np.array([f]))[0]
+    g_num = (L(F[0] + eps) - L(F[0] - eps)) / (2 * eps)
+    h_num = (L(F[0] + eps) - 2 * L(F[0]) + L(F[0] - eps)) / eps**2
+    print(f"{name:9s} g = {loss.gradient(yy, F)[0]:+.5f} (численно {g_num:+.5f}),"
+          f" h = {loss.hessian(yy, F)[0]:.5f} (численно {h_num:.5f})")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Второй порядок заменяет потери параболой $L_0 + g w + \frac12 h w^2$; её минимум — шаг Ньютона $-g/h$.</li>
+    <li>Для обучения XGBoost достаточно двух функций: $g(y, F)$ и $h(y, F)$.</li>
+    <li>Гессиан переводит шаг в шкалу прогноза: шаг первого порядка зависит от масштаба $y$, шаг Ньютона — нет.</li>
+    <li>При $h = 0$ (L1, квантили) значения листьев пересчитывают точным линейным поиском.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Пуассон: y = 12, текущий прогноз μ = e^F = 4. Шаг Ньютона −g/h равен…", "options": ["8", "2", "3"], "answer": 1, "explain": "g = μ − y = −8, h = μ = 4, −g/h = 2. Новый прогноз e^{F+2} ≈ 29.6 — Ньютон «перелетает», поэтому и нужен темп ν."},
+    {"q": "Почему для квадратичной потери приближение второго порядка точное?", "options": ["потому что h = 1", "потому что сама потеря — парабола по F", "потому что g = 0"], "answer": 1, "explain": "У параболы производные выше второй равны нулю, ряд Тейлора обрывается."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

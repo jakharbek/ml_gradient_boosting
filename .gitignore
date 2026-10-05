@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+build/
+dist/
+catboost_info/
+
+# Node
+node_modules/
+
+# Секреты и локальные настройки (никогда не публикуются)
+.env
+.env.*
+*.pem
+*.key
+.claude/settings.local.json
+
+# ОС и редакторы
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Временные файлы
+*.tmp
+*.log
+qa_shots/

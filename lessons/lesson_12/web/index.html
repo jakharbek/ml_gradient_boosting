@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_12">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>12. Интерпретация бустинга</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем этот модуль</h2>
+  <p class="lead">Модель из 500 деревьев точна, но непрозрачна. А объяснять нужно: чтобы найти ошибку в данных или утечку, чтобы убедить заказчика, чтобы ответить клиенту, почему ему отказали в кредите. Интерпретация отвечает на три разных вопроса — и для каждого свой инструмент.</p>
+</section>
+
+<section id="questions">
+  <h2>Три вопроса к модели</h2>
+  <table>
+    <thead><tr><th>Вопрос</th><th>Масштаб</th><th>Инструмент</th><th>Урок</th></tr></thead>
+    <tbody>
+      <tr><td>Какие признаки важны?</td><td>вся модель</td><td>важности: gain, перестановочная, среднее |SHAP|</td><td><a data-lesson="lesson_12_1"></a></td></tr>
+      <tr><td>Почему у этого объекта такой прогноз?</td><td>один объект</td><td>значения Шепли (SHAP)</td><td><a data-lesson="lesson_12_2"></a></td></tr>
+      <tr><td>Как прогноз зависит от признака?</td><td>вся модель и отдельные объекты</td><td>PDP, ICE, зависимость SHAP</td><td><a data-lesson="lesson_12_3"></a></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="demo">
+  <h2>Разложение прогноза на вклады</h2>
+  <p>Главная идея модуля видна уже на одном объекте. Прогноз раскладывается в сумму: базовое значение (средний прогноз) плюс вклад каждого признака:</p>
+  <div class="formula">$$F(x) = \varphi_0 + \sum_{j=1}^{d} \varphi_j(x).$$</div>
+  <p>Вклады $\varphi_j$ — значения Шепли из теории кооперативных игр: справедливое распределение «выигрыша» $F(x) - \varphi_0$ между признаками. Как именно они считаются — в уроке <a data-lesson="lesson_12_2"></a>.</p>
+  <div data-widget="explain-one"></div>
+  <p>Проверьте: база плюс сумма вкладов в точности равна прогнозу модели. Средний модуль вкладов по многим объектам — глобальная важность признака. Для шумовых $x_5$ и $x_6$ она почти нулевая, а у $x_3$ и $x_1$ — наибольшая.</p>
+</section>
+
+<section id="plan">
+  <h2>Уроки модуля</h2>
+  <div class="bones" data-title="Интерпретация по косточкам">
+    <details class="bone" open><summary data-go="lesson_12_1">Важность признаков</summary><div class="bone-body"><p>Встроенные важности, перестановочная, SHAP; ловушки коррелированных признаков и признаков с большим числом значений.</p></div></details>
+    <details class="bone"><summary data-go="lesson_12_2">Значения Шепли и SHAP</summary><div class="bone-body"><p>Коалиции признаков, аксиомы, TreeSHAP; сводные графики и графики зависимости.</p></div></details>
+    <details class="bone"><summary data-go="lesson_12_3">PDP, ICE и монотонные ограничения</summary><div class="bone-body"><p>Средний эффект признака и его разнообразие по объектам; как заставить модель быть монотонной.</p></div></details>
+  </div>
+  <div data-sublessons></div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Точные значения Шепли в gbcourse">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, GBRegressor
+from gbcourse.explain import shapley_values
+
+X, y = datasets.friedman1(n=600, noise=1.0, seed=180, n_features=7)
+model = GBRegressor(n_estimators=100, max_depth=3, learning_rate=0.1).fit(X, y)
+base, phi = shapley_values(model, X[0])
+print("база φ₀ =", round(base, 4))
+print("вклады:", np.round(phi, 3))
+print("φ₀ + Σφ =", round(base + phi.sum(), 6), "| прогноз =", round(model.predict(X[:1])[0], 6))</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Вопросы «что важно», «почему этот прогноз» и «как влияет признак» требуют разных инструментов.</li>
+    <li>Значения Шепли раскладывают прогноз точно: база + сумма вкладов = прогноз.</li>
+    <li>Средний модуль вкладов по объектам — глобальная важность.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "База φ₀ = 14.4, вклады признаков 1.5, −0.3, 2.1. Прогноз модели?", "options": ["14.4", "17.7", "3.3"], "answer": 1, "explain": "14.4 + 1.5 − 0.3 + 2.1 = 17.7."},
+    {"q": "Нужно объяснить клиенту, почему его заявка отклонена. Какой инструмент?", "options": ["глобальная важность признаков", "значения Шепли для этого объекта", "PDP"], "answer": 1, "explain": "Это локальный вопрос об одном объекте."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

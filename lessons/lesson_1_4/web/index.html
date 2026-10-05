@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_1_4">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>1.4 Переобучение, смещение и разброс, валидация</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Добавляя деревья в бустинг, мы всегда уменьшаем ошибку на обучении. Но в какой-то момент ошибка на новых данных начинает расти. Этот урок объясняет, почему, — и даёт словарь, без которого не понять регуляризацию.</p>
+  <p>Главная пара понятий — <strong>смещение</strong> (bias) и <strong>разброс</strong> (variance). Они объяснят, почему случайный лес усредняет глубокие деревья, а бустинг складывает мелкие, и что делают почти все гиперпараметры.</p>
+</section>
+
+<section id="fit">
+  <h2>Недообучение и переобучение</h2>
+  <div class="compare">
+    <div><h4>Недообучение (underfitting)</h4><p>Модель слишком проста и не улавливает закономерность: прямая для синуса, бустинг из 3 деревьев. Ошибка велика и на обучении, и на тесте.</p></div>
+    <div><h4>Переобучение (overfitting)</h4><p>Модель слишком гибкая и подгоняется под шум: дерево глубины 12, бустинг из 5000 деревьев с большим темпом. Ошибка на обучении мала, на тесте — велика.</p></div>
+  </div>
+  <p>Лучшая модель — посередине. Но «середину» нельзя найти по ошибке на обучении: она монотонно падает с ростом сложности. Нужна отдельная выборка.</p>
+</section>
+
+<section id="bv">
+  <h2>Смещение и разброс: увидеть глазами</h2>
+  <p>Представим, что у нас не одна обучающая выборка, а 30 разных — из одного и того же источника, но с разным шумом. Обучим модель на каждой и нарисуем все 30 ответов:</p>
+  <div data-widget="bias-variance"></div>
+  <ul>
+    <li><strong>Смещение</strong> — насколько <em>средний</em> ответ моделей (синяя линия) отклоняется от истины. Большое у простых моделей: они систематически не могут повторить форму.</li>
+    <li><strong>Разброс</strong> — насколько ответы разных моделей (светлые линии) расходятся между собой. Большой у гибких моделей: каждая подстраивается под свой шум.</li>
+  </ul>
+  <div class="formula">$$\underbrace{\mathbb{E}\big[(y - \hat F(x))^2\big]}_{\text{ожидаемая ошибка}} = \underbrace{\big(f(x) - \mathbb{E}\hat F(x)\big)^2}_{\text{смещение}^2} + \underbrace{\mathbb{E}\big[(\hat F(x) - \mathbb{E}\hat F(x))^2\big]}_{\text{разброс}} + \underbrace{\sigma^2}_{\text{шум}}$$</div>
+  <dl class="formula-legend">
+    <dt>$f(x)$</dt><dd>истинная зависимость; $y = f(x) + \varepsilon$, шум $\varepsilon$ с дисперсией $\sigma^2$</dd>
+    <dt>$\hat F(x)$</dt><dd>модель, обученная на случайной выборке — сама случайная величина</dd>
+    <dt>$\mathbb{E}\hat F(x)$</dt><dd>средний ответ модели по всем возможным обучающим выборкам</dd>
+  </dl>
+  <div class="bones" data-title="Разбор по косточкам: откуда берётся ошибка">
+    <details class="bone"><summary>Шум σ² — неустранимая часть</summary><div class="bone-body"><p>Даже идеальная модель $\hat F = f$ ошибается на $\varepsilon$. Ниже этой планки не опуститься.</p></div></details>
+    <details class="bone"><summary>Смещение — ошибка «формы»</summary><div class="bone-body">
+      <p>Возникает, когда класс моделей не может представить истинную функцию. Лечится усложнением модели.</p>
+      <details class="bone"><summary data-go="lesson_3_2">Бустинг уменьшает смещение</summary><div class="bone-body"><p>Каждое дерево исправляет систематические ошибки суммы — из очень простых деревьев складывается сложная функция.</p></div></details>
+    </div></details>
+    <details class="bone"><summary>Разброс — ошибка «неустойчивости»</summary><div class="bone-body">
+      <p>Возникает, когда модель слишком чутко реагирует на конкретную выборку. Лечится упрощением или усреднением.</p>
+      <details class="bone"><summary data-go="lesson_3_1">Бэггинг уменьшает разброс</summary><div class="bone-body"><p>Среднее многих независимых моделей колеблется меньше каждой из них.</p></div></details>
+      <details class="bone"><summary data-go="lesson_7">Регуляризация бустинга борется с разбросом</summary><div class="bone-body"><p>Маленький темп, подвыборки, ограничение деревьев, ранняя остановка.</p></div></details>
+    </div></details>
+  </div>
+</section>
+
+<section id="validation">
+  <h2>Валидация: как выбрать сложность на практике</h2>
+  <p>В жизни у нас одна выборка, и истинная функция неизвестна. Поэтому ошибку на новых данных <em>оценивают</em>:</p>
+  <div class="steps">
+    <section class="step">
+      <h4>Отложенная выборка (hold-out)</h4>
+      <p>Делим данные: например, 60% — обучение, 20% — валидация (выбор гиперпараметров), 20% — тест (финальная оценка). Просто и быстро; минус — оценка шумная на маленьких данных, а часть данных «не работает» на обучение.</p>
+    </section>
+    <section class="step">
+      <h4>k-fold кросс-валидация</h4>
+      <p>Делим данные на $k$ частей (фолдов). $k$ раз обучаем модель на $k-1$ частях и проверяем на оставшейся. Итог — среднее $k$ ошибок:</p>
+      <div class="formula">$$\mathrm{CV}_k = \frac1k \sum_{j=1}^{k} \mathrm{Err}\big(\hat F^{(-j)},\ \text{фолд } j\big)$$</div>
+      <p>Каждый объект ровно один раз оказывается в проверке. Оценка надёжнее, но обучение в $k$ раз дороже.</p>
+    </section>
+    <section class="step">
+      <h4>Утечки и время</h4>
+      <p>Если данные упорядочены во времени, перемешивать их нельзя: модель «подсмотрит будущее». Тогда валидация всегда идёт после обучения по времени. Подробно — в уроке <a data-lesson="lesson_11_2"></a>.</p>
+    </section>
+    <section class="step">
+      <h4>Тест — неприкосновенен</h4>
+      <p>Если выбирать гиперпараметры по тесту, он перестаёт быть честной оценкой: модель подгоняется и под него. Тестом пользуются один раз, в самом конце.</p>
+    </section>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Смещение и разброс деревьев разной глубины">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, RegressionTree
+
+grid = np.linspace(0, 10, 200).reshape(-1, 1)
+truth = np.sin(grid[:, 0])
+for depth in (1, 3, 8):
+    preds = []
+    for seed in range(1, 31):                      # 30 разных обучающих выборок
+        X, y = datasets.regression_1d(kind="sine", n=30, noise=0.35, seed=seed)
+        preds.append(RegressionTree(max_depth=depth).fit(X, -y).predict(grid))
+    preds = np.array(preds)
+    bias2 = np.mean((preds.mean(axis=0) - truth) ** 2)
+    var = np.mean(preds.var(axis=0))
+    print(f"глубина {depth}: смещение² = {bias2:.3f}, разброс = {var:.3f}, сумма + шум = {bias2 + var + 0.35**2:.3f}")</code></pre>
+  </div>
+  <p>Кросс-валидация в scikit-learn — одна функция:</p>
+  <div class="pycell" data-title="5-fold кросс-валидация бустинга">
+<pre><code class="language-python">from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import GradientBoostingRegressor
+
+X, y = datasets.regression_1d(kind="sine", n=150, noise=0.35, seed=1)
+for n in (5, 50, 500):
+    model = GradientBoostingRegressor(n_estimators=n, learning_rate=0.3, max_depth=3)
+    scores = -cross_val_score(model, X, y, cv=5, scoring="neg_mean_squared_error")
+    print(f"{n:4d} деревьев: CV MSE = {scores.mean():.3f} ± {scores.std():.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Ошибка на обучении всегда падает с ростом сложности; ошибка на новых данных имеет U-форму.</li>
+    <li>Ожидаемая ошибка = смещение² + разброс + шум. Простые модели страдают от смещения, гибкие — от разброса.</li>
+    <li>Бэггинг борется с разбросом, бустинг — со смещением, а его регуляризация сдерживает разброс.</li>
+    <li>Сложность выбирают по валидации или кросс-валидации; тест — только для финальной оценки.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Модели, обученные на разных выборках, сильно отличаются друг от друга, но их среднее близко к истине. Что преобладает?", "options": ["Смещение", "Разброс", "Шум"], "answer": 1, "explain": "Среднее близко к истине — смещение мало; ответы расходятся — велик разброс."},
+    {"q": "Что уменьшает усреднение многих независимо обученных моделей?", "options": ["Смещение", "Разброс", "Шум данных"], "answer": 1, "explain": "Дисперсия среднего независимых величин в B раз меньше. Смещение среднего равно смещению каждой модели."},
+    {"q": "Можно ли выбрать глубину дерева по ошибке на тестовой выборке, а потом по ней же отчитаться о качестве?", "options": ["Да, так и делают", "Нет: тест станет частью подбора, и оценка будет оптимистичной"], "answer": 1, "explain": "Для выбора — валидация или CV, тест — один раз в конце."},
+    {"q": "При 5-fold кросс-валидации каждый объект…", "options": ["попадает в проверку ровно один раз", "попадает в проверку 5 раз", "никогда не используется для обучения"], "answer": 0, "explain": "Объект в проверке в одном фолде и в обучении — в остальных четырёх."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

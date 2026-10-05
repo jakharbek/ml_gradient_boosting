@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_9">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>9. Библиотеки бустинга: XGBoost, LightGBM, CatBoost</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем этот модуль</h2>
+  <p class="lead">Мы уже знаем алгоритм целиком: псевдо-остатки, второй порядок, штрафы, гистограммы. На практике его запускают через одну из трёх библиотек. Все три реализуют <b>одно и то же ядро</b>, но принимают разные инженерные решения. От этих решений зависят скорость, поведение по умолчанию и то, как библиотека обращается с категориями.</p>
+</section>
+
+<section id="history">
+  <h2>Кто и что придумал</h2>
+  <table>
+    <thead><tr><th>Год</th><th>Что</th><th>Ключевая идея</th></tr></thead>
+    <tbody>
+      <tr><td>1999–2001</td><td>Gradient Boosting Machine (Фридман)</td><td>бустинг как градиентный спуск в пространстве функций, линейный поиск в листьях (урок <a data-lesson="lesson_5_2"></a>)</td></tr>
+      <tr><td>2014–2016</td><td>XGBoost (Чен, Гестрин)</td><td>регуляризованная цель второго порядка, пропуски, параллельный поиск разбиений (модуль <a data-lesson="lesson_8"></a>)</td></tr>
+      <tr><td>2016–2017</td><td>LightGBM (Microsoft)</td><td>гистограммы, рост по листьям (leaf-wise), GOSS, связывание признаков (EFB)</td></tr>
+      <tr><td>2017–2018</td><td>CatBoost (Яндекс)</td><td>упорядоченные статистики для категорий, упорядоченный бустинг, симметричные деревья</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="map">
+  <h2>Уроки модуля</h2>
+  <div class="bones" data-title="Библиотеки по косточкам">
+    <details class="bone" open><summary data-go="lesson_9_1">XGBoost на практике</summary><div class="bone-body"><p>Два API (sklearn-обёртка и <code>xgb.train</code>), ранняя остановка, метрики, важности признаков, сохранение модели.</p></div></details>
+    <details class="bone"><summary data-go="lesson_9_2">LightGBM: рост по листьям, GOSS, EFB</summary><div class="bone-body"><p>Почему <code>num_leaves</code> важнее глубины, как выборка по градиентам экономит время, как склеиваются редкие признаки.</p></div></details>
+    <details class="bone"><summary data-go="lesson_9_3">CatBoost: категории и симметричные деревья</summary><div class="bone-body"><p>Утечка целевой переменной в наивном кодировании категорий и её лечение; симметричные деревья как регуляризация и быстрый прогноз.</p></div></details>
+    <details class="bone"><summary data-go="lesson_9_4">Сравнение и выбор</summary><div class="bone-body"><p>Один протокол для трёх библиотек: качество, время, чувствительность к параметрам.</p></div></details>
+  </div>
+  <div data-sublessons></div>
+</section>
+
+<section id="rosetta">
+  <h2>Словарь параметров</h2>
+  <p>Одно и то же понятие называется по-разному. Значения по умолчанию проверены на установленных версиях (XGBoost 3.4, LightGBM 4.7, CatBoost 1.2): их выводит ноутбук урока.</p>
+  <div data-widget="rosetta"></div>
+  <div class="callout warn"><p><b>Три значения по умолчанию, о которых стоит помнить.</b> (1) У XGBoost темп 0.3, у LightGBM 0.1, а CatBoost подбирает темп сам по размеру данных и числу итераций. (2) LightGBM ограничивает не глубину, а число листьев (31). Дерево растёт по листьям и может стать очень глубоким: в пределе — цепочка глубины 30. (3) LightGBM по умолчанию не штрафует листья (λ = 0) и требует минимум 20 объектов в листе; XGBoost ставит λ = 1 и ограничивает только сумму гессианов в листе (<code>min_child_weight</code> = 1).</p></div>
+</section>
+
+<section id="code">
+  <h2>В коде: одна задача — три библиотеки</h2>
+  <p>XGBoost и LightGBM работают прямо в браузере; CatBoost для браузера не собран, его код — в ноутбуке урока.</p>
+  <div class="pycell" data-title="XGBoost и LightGBM с параметрами по умолчанию">
+<pre><code class="language-python">import numpy as np
+import lightgbm as lgb
+import xgboost as xgb
+from gbcourse import datasets
+
+X, y = datasets.friedman1(n=2000, noise=1.0, seed=91)
+X_tr, X_te, y_tr, y_te = datasets.train_test_split(X, y, test_size=0.3, seed=0)
+models = {"XGBoost": xgb.XGBRegressor(), "LightGBM": lgb.LGBMRegressor(verbose=-1)}
+for name, m in models.items():
+    m.fit(X_tr, y_tr)
+    print(f"{name:9s} MSE на тесте {np.mean((y_te - m.predict(X_te)) ** 2):.3f}")</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>XGBoost, LightGBM и CatBoost реализуют один алгоритм — бустинг второго порядка на гистограммах.</li>
+    <li>Отличия: форма и порядок роста деревьев, выборка строк, работа с категориями, значения по умолчанию.</li>
+    <li>Переходя между библиотеками, сверяйте не названия, а смысл параметров и их значения по умолчанию.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Как называется L2-штраф на значения листьев в CatBoost?", "options": ["reg_lambda", "l2_leaf_reg", "lambda_l2"], "answer": 1, "explain": "В XGBoost — reg_lambda (lambda), в LightGBM — reg_lambda (lambda_l2), в CatBoost — l2_leaf_reg."},
+    {"q": "Какое ограничение размера дерева главное в LightGBM по умолчанию?", "options": ["max_depth = 6", "num_leaves = 31", "min_child_weight = 1"], "answer": 1, "explain": "max_depth = −1 (без ограничения), размер задаёт num_leaves."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

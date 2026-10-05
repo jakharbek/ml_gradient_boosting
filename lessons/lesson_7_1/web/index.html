@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_7_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>7.1 Ранняя остановка</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Число деревьев — самый важный гиперпараметр бустинга, и его почти никогда не задают вручную. Его находят ранней остановкой: обучение идёт, пока ошибка на валидации улучшается.</p>
+  <p>Это дёшево (одно обучение вместо перебора), надёжно и есть во всех библиотеках. Но у правила есть тонкости — шум валидации, выбор терпения, финальное обучение на всех данных.</p>
+</section>
+
+<section id="rule">
+  <h2>Правило</h2>
+  <ol>
+    <li>Отложите валидационную выборку.</li>
+    <li>После каждого дерева считайте потери на валидации и запоминайте лучшее значение.</li>
+    <li>Если лучшего значения не было <strong>patience</strong> итераций подряд — остановитесь.</li>
+    <li>Верните модель к лучшей итерации: лишние деревья после неё отбросьте.</li>
+  </ol>
+  <div data-widget="early-stop"></div>
+  <div class="callout note"><p>Кривая валидации шумная: она может ненадолго подрасти и снова пойти вниз. Слишком маленькое терпение останавливает обучение на случайном «бугорке», слишком большое — тратит время. Разумное значение — несколько процентов от ожидаемого числа деревьев, и чем меньше темп, тем больше терпение.</p></div>
+</section>
+
+<section id="pitfalls">
+  <h2>Тонкости</h2>
+  <div class="bones" data-title="Ранняя остановка по косточкам">
+    <details class="bone" open><summary>Валидация участвует в выборе — значит, она уже не тест</summary><div class="bone-body"><p>Лучшая итерация подобрана по валидации, поэтому ошибка на ней чуть оптимистична. Итоговое качество — на отдельном тесте.</p></div></details>
+    <details class="bone"><summary>Какую метрику отслеживать</summary><div class="bone-body"><p>Лучше всего — ту же функцию потерь, что оптимизируется (она гладкая). Точность или AUC ступенчаты и шумны на малой валидации (урок <a data-lesson="lesson_6"></a>).</p></div></details>
+    <details class="bone"><summary>Финальная модель на всех данных</summary><div class="bone-body">
+      <p>Часто после выбора числа деревьев модель переобучают на обучении + валидации. Деревьев берут чуть больше найденного (например, ×1.1–1.2), так как данных стало больше. Надёжнее — выбрать число деревьев кросс-валидацией: среднее лучших итераций по фолдам.</p>
+    </div></details>
+    <details class="bone"><summary>Утечка через время</summary><div class="bone-body"><p>Для временных рядов валидация должна идти после обучения по времени — иначе ранняя остановка подстроится под будущее.</p></div></details>
+  </div>
+</section>
+
+<section id="api">
+  <h2>В библиотеках</h2>
+  <table>
+    <thead><tr><th>Библиотека</th><th>Как включить</th><th>Лучшая итерация</th></tr></thead>
+    <tbody>
+      <tr><td>scikit-learn (GB)</td><td><code>n_iter_no_change=20, validation_fraction=0.1</code></td><td><code>n_estimators_</code> (остановка, без возврата к лучшей)</td></tr>
+      <tr><td>scikit-learn (HistGB)</td><td><code>early_stopping=True, n_iter_no_change=20</code></td><td><code>n_iter_</code></td></tr>
+      <tr><td>XGBoost</td><td><code>XGBRegressor(early_stopping_rounds=50)</code>, <code>fit(..., eval_set=[(X_val, y_val)])</code></td><td><code>best_iteration</code>; <code>predict</code> использует её автоматически</td></tr>
+      <tr><td>LightGBM</td><td><code>callbacks=[lgb.early_stopping(50)]</code></td><td><code>best_iteration_</code></td></tr>
+      <tr><td>CatBoost</td><td><code>od_type="Iter", od_wait=50</code> или <code>early_stopping_rounds=50</code></td><td><code>get_best_iteration()</code>, <code>use_best_model=True</code></td></tr>
+      <tr><td>gbcourse</td><td><code>GBRegressor(early_stopping_rounds=50).fit(X, y, eval_set=(X_val, y_val))</code></td><td><code>best_iteration_</code>, модель обрезается</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Ранняя остановка в gbcourse и XGBoost">
+<pre><code class="language-python">from gbcourse import datasets, GBRegressor
+from xgboost import XGBRegressor
+
+X, y = datasets.regression_1d(kind="wave", n=600, noise=0.6, seed=72)
+X_tr, X_val, y_tr, y_val = datasets.train_test_split(X, y, test_size=0.3, seed=0)
+
+m = GBRegressor(n_estimators=2000, learning_rate=0.05, max_depth=3, early_stopping_rounds=50)
+m.fit(X_tr, y_tr, eval_set=(X_val, y_val))
+print("gbcourse: обучено", len(m.history_["eval"]) - 1, "деревьев, оставлено", m.n_trees_)
+
+xgb = XGBRegressor(n_estimators=2000, learning_rate=0.05, max_depth=3, early_stopping_rounds=50)
+xgb.fit(X_tr, y_tr, eval_set=[(X_val, y_val)], verbose=False)
+print("XGBoost: лучшая итерация", xgb.best_iteration)</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Число деревьев выбирают по валидации: останавливаются, когда нет улучшения patience итераций, и возвращаются к лучшей.</li>
+    <li>Терпение должно превышать «дрожание» кривой; с маленьким темпом его увеличивают.</li>
+    <li>Итоговое качество оценивают на отдельном тесте; для финальной модели число деревьев надёжнее брать из кросс-валидации.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Лучшая итерация 180, patience = 50. На какой итерации остановится обучение (если после 180 улучшений не было)?", "options": ["180", "230", "50"], "answer": 1, "explain": "180 + 50 = 230; затем модель обрезается до 180 деревьев."},
+    {"q": "Почему ошибку на валидации в лучшей итерации нельзя считать итоговым качеством?", "options": ["Валидация использовалась для выбора и оценка оптимистична", "Потому что валидация меньше теста", "Можно"], "answer": 0, "explain": "Это та же ловушка, что подбор гиперпараметров по тесту."},
+    {"q": "Темп уменьшили с 0.1 до 0.01. Что сделать с patience?", "options": ["Увеличить", "Уменьшить", "Не менять"], "answer": 0, "explain": "Кривая стала в ~10 раз «длиннее», и её колебания растягиваются на большее число итераций."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>

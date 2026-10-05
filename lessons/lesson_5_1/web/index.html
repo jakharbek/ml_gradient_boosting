@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru" data-lesson="lesson_5_1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>5.1 Функциональный градиент и псевдо-остатки</title>
+  <link rel="icon" href="../../../shared/web/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../shared/web/css/course.css">
+  <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
+</head>
+<body>
+<main class="lesson" id="lesson">
+
+<section id="why">
+  <h2>Зачем это нужно</h2>
+  <p class="lead">Это центральный урок курса: здесь градиентный бустинг выводится из градиентного спуска, а не придумывается. После него любая новая функция потерь превращается в алгоритм бустинга механически.</p>
+</section>
+
+<section id="params">
+  <h2>Прогнозы как параметры</h2>
+  <p>Эмпирический риск зависит от модели только через её прогнозы на обучающих объектах. Обозначим их вектором:</p>
+  <div class="formula">$$\mathbf F = \big(F(x_1), \dots, F(x_n)\big) \in \mathbb R^n, \qquad R(\mathbf F) = \frac1n \sum_{i=1}^{n} L\big(y_i, F_i\big)$$</div>
+  <p>Теперь $R$ — обычная функция $n$ переменных. Её градиент считается покомпонентно, и каждая компонента зависит только от своего объекта:</p>
+  <div class="formula">$$\frac{\partial R}{\partial F_i} = \frac1n \,\frac{\partial L(y_i, F_i)}{\partial F_i} = \frac1n\, g_i$$</div>
+  <p>Антиградиент (с точностью до множителя $\frac1n$, который уходит в длину шага) называют <strong>псевдо-остатками</strong>:</p>
+  <div class="formula">$$r_i = -g_i = -\frac{\partial L(y_i, F)}{\partial F}\Big|_{F = F_{m-1}(x_i)}$$</div>
+</section>
+
+<section id="free">
+  <h2>Свободный шаг: почему не годится</h2>
+  <p>Можно было бы просто делать градиентный спуск по вектору $\mathbf F$: $F_i \leftarrow F_i + \nu r_i$. Для L2 он сходится к $F_i = y_i$ — модель запоминает все обучающие ответы вместе с шумом. И главное: этот спуск меняет прогнозы <em>только в обучающих точках</em>. Для нового $x$ он не говорит ничего.</p>
+  <p>Нужна функция, определённая везде. Решение Фридмана: вместо вектора $r$ сделать шаг функцией из заданного класса — деревом $h$, которое <em>ближе всего</em> к $r$ на обучающих точках:</p>
+  <div class="formula">$$h_m = \arg\min_{h \in \text{деревья}} \sum_{i=1}^{n} \big(r_i - h(x_i)\big)^2$$</div>
+  <p>Это <strong>проекция</strong> антиградиента на множество деревьев. Дерево не может в точности повторить шумный вектор $r$, но улавливает его систематическую часть — ту, что повторится и на новых данных.</p>
+  <div data-widget="free-vs-tree"></div>
+</section>
+
+<section id="projection">
+  <h2>Насколько дерево повторяет градиент</h2>
+  <p>Качество проекции удобно мерить косинусом угла между вектором псевдо-остатков $r$ и прогнозами дерева $h$ на обучающих точках:</p>
+  <div class="formula">$$\cos\angle(r, h) = \frac{\sum_i r_i h(x_i)}{\|r\|\,\|h\|}$$</div>
+  <p>Если косинус положителен, шаг деревом — направление убывания риска (производная по направлению отрицательна). В начале обучения, когда в остатках много структуры, косинус большой; к концу остатки становятся шумом, и дерево повторяет их всё хуже. Это естественный сигнал: дальнейшие шаги мало что дают.</p>
+  <div class="callout formal"><p>Для L2 и дерева, построенного методом наименьших квадратов, $\langle r, h\rangle = \|h\|^2 &gt; 0$: значения листьев — средние $r$ в листьях, поэтому шаг деревом всегда уменьшает риск (при достаточно малом ν).</p></div>
+</section>
+
+<section id="pseudo">
+  <h2>Псевдо-остатки для разных потерь</h2>
+  <table>
+    <thead><tr><th>Потери $L(y, F)$</th><th>Псевдо-остаток $r = -\partial L/\partial F$</th><th>Смысл</th></tr></thead>
+    <tbody>
+      <tr><td>$\tfrac12(y-F)^2$</td><td>$y - F$</td><td>обычный остаток</td></tr>
+      <tr><td>$|y - F|$</td><td>$\operatorname{sign}(y - F)$</td><td>только направление, величина не важна</td></tr>
+      <tr><td>Хьюбер</td><td>$y - F$ при $|y-F|\le\delta$, иначе $\delta\operatorname{sign}(y-F)$</td><td>остаток, обрезанный до $\pm\delta$</td></tr>
+      <tr><td>Квантильная (α)</td><td>$\alpha$ при $y &gt; F$, иначе $\alpha - 1$</td><td>асимметричный знак</td></tr>
+      <tr><td>Логистическая, $F$ = log-шансы</td><td>$y - \sigma(F)$</td><td>ответ минус вероятность (урок <a data-lesson="lesson_6_1"></a>)</td></tr>
+      <tr><td>Пуассона, $F = \log\mu$</td><td>$y - e^{F}$</td><td>число событий минус ожидаемое</td></tr>
+    </tbody>
+  </table>
+  <div class="bones" data-title="Шаг функционального спуска по косточкам">
+    <details class="bone" open><summary>Направление: антиградиент по вектору прогнозов</summary><div class="bone-body"><p>Покомпонентные производные потерь — дёшево, для каждого объекта отдельно.</p></div></details>
+    <details class="bone"><summary>Обобщение: проекция на деревья</summary><div class="bone-body">
+      <details class="bone"><summary data-go="lesson_2_1">Структура дерева по наименьшим квадратам</summary><div class="bone-body"><p>Разбиения ищутся как в регрессии: псевдо-остатки — «целевая переменная».</p></div></details>
+      <details class="bone"><summary data-go="lesson_5_2">Значения листьев — лучшие для исходных потерь</summary><div class="bone-body"><p>Среднее псевдо-остатков — не всегда лучший шаг для самих потерь; Фридман пересчитывает листья линейным поиском.</p></div></details>
+    </div></details>
+    <details class="bone"><summary data-go="lesson_4_2">Длина шага: темп ν</summary><div class="bone-body"><p>Та же роль, что у η в обычном градиентном спуске.</p></div></details>
+    <details class="bone"><summary data-go="lesson_8_1">Второй порядок: шаг Ньютона</summary><div class="bone-body"><p>Если знать кривизну $h_i = \partial^2 L/\partial F^2$, можно выбрать шаг точнее — так работает XGBoost.</p></div></details>
+  </div>
+</section>
+
+<section id="code">
+  <h2>В коде</h2>
+  <div class="pycell" data-title="Свободный шаг против шага деревом">
+<pre><code class="language-python">import numpy as np
+from gbcourse import datasets, RegressionTree
+
+X, y = datasets.regression_1d(kind="sine", n=40, noise=0.3, seed=52)
+X_te, y_te = datasets.regression_1d(kind="sine", n=1000, noise=0.3, seed=53)
+nu, steps = 0.3, 60
+F_free = np.full_like(y, y.mean())                 # свободный спуск: только в обучающих точках
+F_tree, F_tree_te = F_free.copy(), np.full(len(y_te), y.mean())
+for m in range(steps):
+    F_free += nu * (y - F_free)
+    r = y - F_tree
+    h = RegressionTree(max_depth=2).fit(X, -r)     # проекция антиградиента на деревья
+    F_tree += nu * h.predict(X)
+    F_tree_te += nu * h.predict(X_te)
+print("MSE обучения: свободный", np.mean((y - F_free)**2).round(4), " деревом", np.mean((y - F_tree)**2).round(4))
+print("MSE на новых точках: свободный спуск их не меняет —", np.mean((y_te - y.mean())**2).round(4),
+      "; деревом", np.mean((y_te - F_tree_te)**2).round(4))</code></pre>
+  </div>
+</section>
+
+<section id="summary">
+  <h2>Итоги</h2>
+  <div class="key-points"><ol>
+    <li>Риск зависит от вектора прогнозов на обучающих объектах; его антиградиент — псевдо-остатки.</li>
+    <li>Свободный спуск по этому вектору запоминает данные и не определён на новых $x$.</li>
+    <li>Дерево — проекция антиградиента на класс деревьев: шаг, который обобщается.</li>
+    <li>Для L2 псевдо-остатки = остатки, для других потерь — своя формула; остальное неизменно.</li>
+  </ol></div>
+</section>
+
+<section id="quiz">
+  <h2>Проверь себя</h2>
+  <div class="quiz"><script type="application/json">
+  [
+    {"q": "Почему градиентный бустинг не делает шаг прямо по вектору псевдо-остатков?", "options": ["Такой шаг определён только в обучающих точках и лишь запоминает данные", "Это слишком медленно", "Градиент нельзя вычислить"], "answer": 0, "explain": "Нужна функция, работающая на новых x; дерево обобщает градиент."},
+    {"q": "Псевдо-остаток квантильных потерь с α = 0.9 для объекта с y > F равен…", "options": ["0.9", "−0.1", "y − F"], "answer": 0, "explain": "−∂L/∂F = α при y > F."},
+    {"q": "Что означает, что cos∠(r, h) близок к нулю в конце обучения?", "options": ["Дерево почти не повторяет направление градиента — остатки стали шумом", "Модель расходится", "Нужно увеличить темп"], "answer": 0, "explain": "Систематической структуры в остатках не осталось."}
+  ]
+  </script></div>
+</section>
+
+</main>
+</body>
+</html>
