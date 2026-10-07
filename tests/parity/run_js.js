@@ -47,6 +47,8 @@ for (const c of cases) {
   out[c.name] = {
     X: X.map((r) => r.map((v) => (Number.isNaN(v) ? null : v))),
     y,
+    X_eval: evalSet ? evalSet[0].map((r) => r.map((v) => (Number.isNaN(v) ? null : v))) : null,
+    y_eval: evalSet ? evalSet[1] : null,
     raw: model.predictRaw(X),
     train: model.history.train,
     eval: model.history.eval,

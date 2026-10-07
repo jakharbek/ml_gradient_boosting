@@ -2,7 +2,8 @@
 
 Тест запускает ``node tests/parity/run_js.js`` и повторяет те же эксперименты в Python.
 Совпадение проверяется с допуском 1e-9 (расхождения возможны лишь в последнем
-знаке тригонометрии и экспоненты, реализованных по-разному в V8 и libm).
+знаке тригонометрии и экспоненты, реализованных по-разному в V8 и libm). Модели
+обучаются на данных из JS, чтобы такой бит не менял выбор разбиения при ничьей.
 """
 
 from __future__ import annotations
@@ -57,6 +58,14 @@ def test_boosting_parity(case, js_results):
     np.testing.assert_allclose(_nan(js["X"]), X, atol=ATOL, equal_nan=True, err_msg="данные X")
     np.testing.assert_allclose(np.asarray(js["y"], float), np.asarray(y, float), atol=ATOL, err_msg="данные y")
 
+    # Генераторы данных сверены выше с допуском: sin/log/cos в V8 и libm могут разойтись в последнем
+    # бите, а при равенстве выигрышей двух разбиений такой бит меняет выбор дерева. Поэтому движок
+    # сравниваем на побитово одинаковых данных — тех, что построил JS.
+    X, y = _nan(js["X"]), np.asarray(js["y"], dtype=y.dtype)
+    if eval_set is not None:
+        np.testing.assert_allclose(_nan(js["X_eval"]), Xte, atol=ATOL, equal_nan=True, err_msg="данные X_eval")
+        np.testing.assert_allclose(np.asarray(js["y_eval"], float), np.asarray(yte, float), atol=ATOL)
+        eval_set = (_nan(js["X_eval"]), np.asarray(js["y_eval"], dtype=yte.dtype))
     model = GradientBoosting(**case["model"]).fit(X, y, eval_set=eval_set)
     assert model.n_trees_ == js["n_trees"], "число итераций"
     n_nodes = sum(len(t.nodes) for stage in model.trees_ for t in stage)
