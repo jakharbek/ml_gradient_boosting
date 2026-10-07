@@ -7,9 +7,10 @@
 #
 # После урока вы сможете:
 # - распознавать недообучение и переобучение по ошибкам на обучении и на новых данных;
-# - разложить ожидаемую ошибку на смещение², разброс и шум и вычислить их;
+# - объяснить, почему ошибка на обучении занижена на $2p\sigma^2/n$, и оценить уровень шума;
+# - разложить ошибку оценки и модели на смещение², разброс и шум и понимать, почему сжатие выгодно;
 # - читать кривые обучения и понимать роль усреднения и ранней остановки;
-# - организовать валидацию и кросс-валидацию без утечек.
+# - организовать валидацию и кросс-валидацию без утечек, в том числе для временных рядов.
 
 # %%
 import sys
@@ -61,7 +62,109 @@ print(f"дерево: лучшая глубина {depths[int(np.argmin(te))]} (
 print(f"бустинг: лучшее M = {Ms[int(np.argmin(gte))]} (MSE {min(gte):.3f}); M = 500 — обучение {gtr[-1]:.4f}, новые {gte[-1]:.3f}")
 
 # %% [markdown]
-# ## 2. Мишень: смещение² + разброс = средний квадрат промаха
+# ## 2. Насколько занижена ошибка на обучении
+#
+# Модель-константа (среднее $n = 4$ ответов, $\sigma^2 = 1$): ошибка на обучении $\sigma^2(n-1)/n = 0.75$,
+# на новом объекте $\sigma^2(n+1)/n = 1.25$. Проверим симуляцией.
+
+# %%
+r = Mulberry32(3)
+tr_c, te_c = [], []
+for _ in range(20000):
+    e = np.array([r.normal() for _ in range(4)])
+    tr_c.append(np.mean((e - e.mean()) ** 2))
+    te_c.append((r.normal() - e.mean()) ** 2)
+print(f"константа, n = 4: обучение {np.mean(tr_c):.3f} (формула 0.75), новый объект {np.mean(te_c):.3f} (формула 1.25)")
+
+# %% [markdown]
+# Общее правило для $p$ параметров, подобранных МНК: разрыв $2p\sigma^2/n$. Модель из $p$ корзин на 40 точках
+# против дерева: дерево выбирает пороги по ответам, и его «эффективных» параметров больше, чем листьев.
+
+# %%
+n_o, sims, sig = 40, 200, 0.35
+x_o = (np.arange(n_o) + 0.5) * 10 / n_o
+X_o, f_o = x_o.reshape(-1, 1), np.sin(x_o)
+r = Mulberry32(1)
+E1, E2 = [], []
+for _ in range(sims):
+    E1.append([r.normal() for _ in range(n_o)])
+    E2.append([r.normal() for _ in range(n_o)])
+E1, E2 = np.array(E1), np.array(E2)
+
+
+def bins_predict(yv, p):
+    b = (np.arange(n_o) * p) // n_o
+    return (np.bincount(b, yv) / np.bincount(b))[b]
+
+
+ps = np.arange(1, n_o + 1)
+gap_bins = []
+for p in ps:
+    tr_ = np.mean([mse(f_o + sig * E1[k], bins_predict(f_o + sig * E1[k], p)) for k in range(sims)])
+    te_ = np.mean([mse(f_o + sig * E2[k], bins_predict(f_o + sig * E1[k], p)) for k in range(sims)])
+    gap_bins.append(te_ - tr_)
+    if p in (8, 20, 40):
+        print(f"{p:2d} корзин: обучение {tr_:.3f}  новый шум {te_:.3f}  разрыв {te_ - tr_:.3f}  2pσ²/n = {2 * p * sig**2 / n_o:.3f}")
+
+tree_depths = range(1, 13)
+gap_tree, leaves = [], []
+for d in tree_depths:
+    tr_, te_, lv = [], [], []
+    for k in range(sims):
+        pred = RegressionTree(max_depth=d).fit(X_o, -(f_o + sig * E1[k])).predict(X_o)
+        tr_.append(mse(f_o + sig * E1[k], pred))
+        te_.append(mse(f_o + sig * E2[k], pred))
+        lv.append(len(np.unique(pred)))
+    gap_tree.append(np.mean(te_) - np.mean(tr_))
+    leaves.append(np.mean(lv))
+for d in (1, 2, 3):
+    g = gap_tree[d - 1]
+    print(f"дерево глубины {d}: листьев {leaves[d - 1]:.1f}, разрыв {g:.3f}, эффективных параметров {g * n_o / (2 * sig**2):.1f}")
+
+fig, ax = plt.subplots(figsize=(7.5, 3.4))
+ax.plot(ps, 2 * ps * sig**2 / n_o, color=style.MUTED, ls=(0, (5, 3)), label="формула 2pσ²/n")
+ax.plot(ps, gap_bins, "o", ms=3, color=style.BLUE, label="p корзин (симуляция)")
+ax.plot(leaves, gap_tree, "s-", ms=4, color=style.ORANGE, label="дерево глубины 1…12 (по числу листьев)")
+ax.set(xlabel="параметров p / листьев", ylabel="разрыв: новые − обучение", title="Оптимизм ошибки на обучении")
+ax.legend()
+plt.show()
+
+# %% [markdown]
+# Оценка шума по соседям: $\hat\sigma^2 = \frac{1}{2(n-1)}\sum (y_{i+1} - y_i)^2$ (точки упорядочены по $x$).
+
+# %%
+for n_s, noise_s, seed_s in ((300, 0.4, 7), (40, 0.35, 2)):
+    _, ys_ = datasets.regression_1d(kind="sine", n=n_s, noise=noise_s, seed=seed_s)
+    print(f"n = {n_s}: оценка шума {np.mean(np.diff(ys_) ** 2) / 2:.3f}, истинный σ² = {noise_s**2:.4f}")
+
+# %% [markdown]
+# ## 3. Смещение и разброс одного числа: сжатие значения листа
+#
+# В листе $n = 4$ остатка $\mu + \varepsilon$, $\mu = 1$, $\sigma = 2$. Сжатое значение $c\bar r$, $c = n/(n + \lambda)$:
+# смещение² $(1-c)^2\mu^2$, разброс $c^2\sigma^2/n$. Лучшее $\lambda^* = \sigma^2/\mu^2 = 4$.
+
+# %%
+mu, sg, m_leaf = 1.0, 2.0, 4
+lams = np.linspace(0, 30, 301)
+cs = m_leaf / (m_leaf + lams)
+b2_l, v_l = ((1 - cs) * mu) ** 2, cs**2 * sg**2 / m_leaf
+r = Mulberry32(7)
+means = np.array([np.mean([mu + sg * r.normal() for _ in range(m_leaf)]) for _ in range(20000)])
+for lam in (0, 1, 4, 10):
+    c = m_leaf / (m_leaf + lam)
+    print(f"λ = {lam:2d}: формула {((1 - c) * mu) ** 2 + c**2 * sg**2 / m_leaf:.3f}   симуляция {np.mean((c * means - mu) ** 2):.3f}")
+
+fig, ax = plt.subplots(figsize=(7.5, 3.4))
+ax.plot(lams, b2_l, color=style.BLUE, label="смещение²")
+ax.plot(lams, v_l, color=style.ORANGE, label="разброс")
+ax.plot(lams, b2_l + v_l, color=style.AQUA, lw=2.4, label="ошибка")
+ax.axvline(sg**2 / mu**2, color=style.MUTED, ls=(0, (4, 3)), lw=1)
+ax.set(xlabel="сжатие λ", ylabel="ошибка значения листа", title="Минимум при λ* = σ²/μ² = 4: ошибка 0.5 вместо 1")
+ax.legend()
+plt.show()
+
+# %% [markdown]
+# ## 4. Мишень: смещение² + разброс = средний квадрат промаха
 
 # %%
 rng = Mulberry32(1)
@@ -81,7 +184,7 @@ fig.tight_layout()
 plt.show()
 
 # %% [markdown]
-# ## 3. Разложение ошибки на 30 обучающих выборках
+# ## 5. Разложение ошибки на 30 обучающих выборках
 
 # %%
 grid = np.linspace(0, 10, 120).reshape(-1, 1)
@@ -130,7 +233,24 @@ for d in (1, 4, 10):
     print(f"глубина {d:2d}: средняя ошибка на новых {np.mean(errs):.3f}  ≈  смещение² + разброс + шум = {b2 + v + NOISE2:.3f}")
 
 # %% [markdown]
-# ## 4. Кривые обучения
+# Где по оси $x$ сосредоточены смещение и разброс: у пня смещение — у дна синуса, у дерева глубины 4 разброс — у краёв.
+
+# %%
+fig, axes = plt.subplots(1, 2, figsize=(11, 3.4), sharey=True)
+for ax, d in zip(axes, (1, 4)):
+    _, _, P = decompose(lambda X, y, d=d: RegressionTree(max_depth=d).fit(X, -y).predict(grid))
+    b2x, vx = (P.mean(0) - truth) ** 2, P.var(0)
+    ax.plot(grid[:, 0], b2x, color=style.BLUE, label="смещение²(x)")
+    ax.plot(grid[:, 0], vx, color=style.ORANGE, label="разброс(x)")
+    ax.axhline(NOISE2, color=style.MUTED, ls=(0, (4, 3)), lw=1)
+    ax.set(xlabel="x", title=f"глубина {d}: max смещения² {b2x.max():.3f} при x = {grid[b2x.argmax(), 0]:.2f}, max разброса {vx.max():.3f}")
+    ax.legend()
+axes[0].set_ylabel("ошибка")
+fig.tight_layout()
+plt.show()
+
+# %% [markdown]
+# ## 6. Кривые обучения
 
 # %%
 Xbig, ybig = datasets.regression_1d(kind="sine", n=500, noise=0.35, seed=999)
@@ -157,7 +277,7 @@ fig.tight_layout()
 plt.show()
 
 # %% [markdown]
-# ## 5. Усреднение коррелированных моделей
+# ## 7. Усреднение коррелированных моделей
 #
 # $\operatorname{Var}(\text{среднее } B) = \rho\sigma^2 + (1-\rho)\sigma^2/B$.
 
@@ -181,7 +301,7 @@ ax.legend()
 plt.show()
 
 # %% [markdown]
-# ## 6. Ранняя остановка бустинга
+# ## 8. Ранняя остановка бустинга
 
 # %%
 Xs, ys = datasets.regression_1d(kind="sine", n=300, noise=0.4, seed=7)
@@ -206,11 +326,36 @@ es = GBRegressor(n_estimators=500, learning_rate=0.1, max_depth=2, early_stoppin
 print("early_stopping_rounds=30: лучшая итерация", es.best_iteration_, "деревьев оставлено", es.n_trees_)
 
 # %% [markdown]
-# ## 7. k-блочная кросс-валидация
+# ## 9. Лотерея разбиения: одна валидация против кросс-валидации
+#
+# 40 случайных разбиений 80 точек: валидация из 20 точек и 5-блочная CV. Насколько гуляют оценка и выбранная глубина?
 
 # %%
 Xk, yk = datasets.regression_1d(kind="sine", n=80, noise=0.4, seed=7)
 Xkt, ykt = datasets.regression_1d(kind="sine", n=400, noise=0.4, seed=107)
+Hs, Cs = [], []
+for sd in range(1, 41):
+    p = np.array(Mulberry32(sd).permutation(80))
+    va, trn_ = p[:20], p[20:]
+    Hs.append([mse(yk[va], RegressionTree(max_depth=d).fit(Xk[trn_], -yk[trn_]).predict(Xk[va])) for d in range(1, 9)])
+    fold = np.empty(80, dtype=int)
+    fold[p] = np.arange(80) % 5
+    Cs.append([np.mean([mse(yk[fold == j], RegressionTree(max_depth=d).fit(Xk[fold != j], -yk[fold != j]).predict(Xk[fold == j])) for j in range(5)]) for d in range(1, 9)])
+Hs, Cs = np.array(Hs), np.array(Cs)
+print(f"глубина 4: одно разбиение {Hs[:, 3].min():.3f}…{Hs[:, 3].max():.3f} (ст. откл. {Hs[:, 3].std():.3f}), CV ст. откл. {Cs[:, 3].std():.3f}")
+pick_h = np.bincount(Hs.argmin(1) + 1, minlength=9)[1:]
+pick_c = np.bincount(Cs.argmin(1) + 1, minlength=9)[1:]
+fig, ax = plt.subplots(figsize=(7.5, 3.2))
+ax.bar(np.arange(1, 9) - 0.2, pick_h, width=0.38, color=style.ORANGE, label="одно разбиение (20 точек)")
+ax.bar(np.arange(1, 9) + 0.2, pick_c, width=0.38, color=style.BLUE, label="CV, 5 блоков")
+ax.set(xlabel="выбранная глубина", ylabel="разбиений из 40", title="Одно маленькое разбиение — лотерея")
+ax.legend()
+plt.show()
+
+# %% [markdown]
+# ## 10. k-блочная кросс-валидация и правило одной стандартной ошибки
+
+# %%
 perm = Mulberry32(0).permutation(len(yk))
 fold = np.empty(len(yk), dtype=int)
 fold[perm] = np.arange(len(yk)) % 5
@@ -225,9 +370,14 @@ fig, ax = plt.subplots(figsize=(7.5, 3.4))
 ax.fill_between(range(1, 11), cv_mean - cv_std, cv_mean + cv_std, color=style.ORANGE, alpha=0.15)
 ax.plot(range(1, 11), cv_mean, marker="o", color=style.ORANGE, label="5-блочная CV")
 ax.plot(range(1, 11), test_err, marker="s", color=style.AQUA, ls=(0, (5, 3)), label="новые данные")
-ax.set(xlabel="глубина дерева", ylabel="MSE", title=f"CV выбирает глубину {int(np.argmin(cv_mean)) + 1}")
+best = int(np.argmin(cv_mean))
+thr = cv_mean[best] + cv_std[best] / np.sqrt(5)
+one_se = int(np.argmax(cv_mean <= thr)) + 1
+ax.axhline(thr, color=style.MUTED, ls=(0, (2, 3)), lw=1, label="лучшая + 1 ст. ошибка")
+ax.set(xlabel="глубина дерева", ylabel="MSE", title=f"CV выбирает глубину {best + 1}, правило одной ст. ошибки — {one_se}")
 ax.legend()
 plt.show()
+print(f"порог {thr:.3f}: глубина {one_se} (CV {cv_mean[one_se - 1]:.3f}); на новых данных {test_err[one_se - 1]:.3f} против {test_err[best]:.3f}")
 
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.tree import DecisionTreeRegressor
@@ -236,7 +386,7 @@ sk = -cross_val_score(DecisionTreeRegressor(max_depth=4), Xk, yk, cv=KFold(5, sh
 print(f"scikit-learn, глубина 4: CV MSE = {sk.mean():.3f} ± {sk.std():.3f} (другое перемешивание — другое число)")
 
 # %% [markdown]
-# ## 8. Утечка при отборе признаков
+# ## 11. Утечка при отборе признаков
 
 # %%
 from sklearn.feature_selection import SelectKBest, f_regression
@@ -254,6 +404,91 @@ print(f"с утечкой:  R² = {wrong.mean():.3f}")
 print(f"без утечки: R² = {right.mean():.3f}")
 
 # %% [markdown]
+# То же своими руками, как в виджете: блоки из `Mulberry32(0)`, $R^2$ по всем прогнозам вне блоков, $k = 1…20$.
+
+# %%
+fold_l = np.empty(60, dtype=int)
+fold_l[Mulberry32(0).permutation(60)] = np.arange(60) % 5
+
+
+def top_k(Xa, ya, k):
+    Xc, yc = Xa - Xa.mean(0), ya - ya.mean()
+    return np.argsort(-np.abs(Xc.T @ yc) / np.sqrt((Xc**2).sum(0) * (yc**2).sum()), kind="stable")[:k]
+
+
+def ols(Xa, ya, Xb):
+    w = np.linalg.lstsq(np.c_[np.ones(len(Xa)), Xa], ya, rcond=None)[0]
+    return np.c_[np.ones(len(Xb)), Xb] @ w
+
+
+def r2_all(pred):
+    return 1 - np.sum((yn - pred) ** 2) / np.sum((yn - yn.mean()) ** 2)
+
+
+ks = range(1, 21)
+r2_leak, r2_ok = [], []
+for k in ks:
+    S = top_k(Xn, yn, k)
+    pw, pr = np.zeros(60), np.zeros(60)
+    for j in range(5):
+        trm, vam = fold_l != j, fold_l == j
+        pw[vam] = ols(Xn[trm][:, S], yn[trm], Xn[vam][:, S])
+        own = top_k(Xn[trm], yn[trm], k)
+        pr[vam] = ols(Xn[trm][:, own], yn[trm], Xn[vam][:, own])
+    r2_leak.append(r2_all(pw))
+    r2_ok.append(r2_all(pr))
+print(f"k = 10: с утечкой R² = {r2_leak[9]:.3f}, без утечки R² = {r2_ok[9]:.3f}")
+fig, ax = plt.subplots(figsize=(7.5, 3.2))
+ax.plot(ks, r2_leak, color=style.ORANGE, label="отбор по всем данным (утечка)")
+ax.plot(ks, r2_ok, color=style.BLUE, label="отбор внутри блока")
+ax.axhline(0, color=style.MUTED, lw=1)
+ax.set(xlabel="отобрано признаков k", ylabel="R² вне блока", title="Чистый шум: утечка «находит» закономерность")
+ax.legend()
+plt.show()
+
+# %% [markdown]
+# ## 12. Временной ряд: случайные блоки против проверки по времени
+#
+# 10 лет помесячных продаж: рост, сезонность, шум. Дерево по номеру месяца; будущее — следующие 24 месяца.
+
+# %%
+from sklearn.model_selection import TimeSeriesSplit
+
+r = Mulberry32(5)
+t_m = np.arange(144)
+sales = np.array([2 + 0.03 * ti + 0.6 * np.sin(2 * np.pi * ti / 12) + 0.3 * r.normal() for ti in t_m])
+T_m = t_m.reshape(-1, 1).astype(float)
+fold_t = np.empty(120, dtype=int)
+fold_t[Mulberry32(0).permutation(120)] = np.arange(120) % 5
+hist = np.arange(120)
+
+
+def err_t(tr_i, te_i, d):
+    return mse(sales[te_i], RegressionTree(max_depth=d).fit(T_m[tr_i], -sales[tr_i]).predict(T_m[te_i]))
+
+
+rnd_cv, time_cv, fut = [], [], []
+for d in range(1, 11):
+    rnd_cv.append(np.mean([err_t(hist[fold_t != j], hist[fold_t == j], d) for j in range(5)]))
+    time_cv.append(np.mean([err_t(tr_i, te_i, d) for tr_i, te_i in TimeSeriesSplit(n_splits=5).split(hist)]))
+    fut.append(err_t(hist, np.arange(120, 144), d))
+print(f"глубина 6: случайные блоки {rnd_cv[5]:.3f}, по времени {time_cv[5]:.3f}, будущее {fut[5]:.3f}")
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 3.4))
+axes[0].scatter(t_m[:120], sales[:120], s=8, color=style.ROLE["data"], label="история")
+axes[0].scatter(t_m[120:], sales[120:], s=14, facecolors="none", edgecolors=style.AQUA, label="будущее")
+axes[0].step(t_m, RegressionTree(max_depth=6).fit(T_m[:120], -sales[:120]).predict(T_m), where="mid", color=style.BLUE, label="дерево глубины 6")
+axes[0].set(xlabel="месяц t", ylabel="продажи", title="Дерево не продолжает тренд")
+axes[0].legend()
+axes[1].plot(range(1, 11), rnd_cv, color=style.ORANGE, label="случайные блоки")
+axes[1].plot(range(1, 11), time_cv, color=style.BLUE, label="по времени")
+axes[1].plot(range(1, 11), fut, color=style.AQUA, ls=(0, (5, 3)), label="будущее")
+axes[1].set(xlabel="глубина дерева", ylabel="MSE", ylim=(0, 1.5), title="Случайная CV занижает ошибку будущего")
+axes[1].legend()
+fig.tight_layout()
+plt.show()
+
+# %% [markdown]
 # ## Упражнения
 #
 # 1. Модель A: 0.45 / 0.47, модель B: 0.02 / 0.38 (обучение / валидация), шум 0.12. Диагноз?
@@ -265,6 +500,10 @@ print(f"без утечки: R² = {right.mean():.3f}")
 # 7. Обычная и повторённая кросс-валидация: разброс оценок.
 # 8. Что не так, если CV использовали и для выбора, и для итоговой оценки?
 # 9. Утечка при отборе признаков для k = 5, 10, 50.
+# 10. Оптимизм константы: ошибки на обучении и на новом объекте при n = 5, σ² = 1 — формулой и симуляцией.
+# 11. Сжатие листа: μ = 0.5, σ = 1, n = 10 — найдите λ*, c* и ошибку; проверьте симуляцией.
+# 12. Правило одной стандартной ошибки для 10-блочной CV (данные шага 10).
+# 13. Временной ряд: как меняется разрыв между случайной CV и будущим, если убрать тренд (наклон 0)?
 #
 # <details><summary>Решения</summary>
 #
