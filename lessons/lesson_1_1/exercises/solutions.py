@@ -12,6 +12,7 @@ import numpy as np
 
 from gbcourse import GBRegressor, RegressionTree, datasets
 from gbcourse.metrics import mse
+from gbcourse.rng import Mulberry32
 
 
 def task_1() -> None:
@@ -87,6 +88,60 @@ def task_7() -> None:
     print("   Кросс-валидация использует каждый объект и для обучения, и для проверки (урок 1.4).")
 
 
+def task_8() -> None:
+    x = np.array([12, 18, 25, 30, 34, 41, 47, 52, 58, 63, 71, 80.0])
+    y = np.array([0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1])
+
+    def counts(t: float) -> tuple[int, int, int, int]:
+        pred = x >= t
+        return (int(np.sum(~pred & (y == 0))), int(np.sum(pred & (y == 0))),
+                int(np.sum(~pred & (y == 1))), int(np.sum(pred & (y == 1))))
+
+    tn, fp, fn, tp = counts(32)
+    print(f"8) t = 32: TN = {tn}, FP = {fp}, FN = {fn}, TP = {tp}; доля верных {(tp + tn) / 12:.3f}, "
+          f"полнота {tp / (tp + fn):.3f}, точность {tp / (tp + fp):.3f}")
+    assert (tn, fp, fn, tp) == (4, 3, 0, 5)
+    ts = np.arange(0, 101.5, 0.5)
+    acc = [(counts(t)[0] + counts(t)[3]) / 12 for t in ts]
+    best = ts[int(np.argmax(acc))]
+    print(f"   лучший порог {best} (любой из (47, 52]): доля верных {max(acc):.3f}; базовая «все вернут» {np.mean(y == 0):.3f}")
+
+
+def task_9() -> None:
+    def flats(k: float):
+        rng = Mulberry32(3)
+        rows = []
+        for _ in range(60):
+            area = rng.uniform(30, 100)
+            metro = rng.uniform(2, 30)
+            eps = rng.normal()
+            rows.append((area, metro, 0.12 * area + 3 - k * metro + 0.5 * eps))
+        return np.array(rows).T
+
+    def lstsq_mse(cols: list, y: np.ndarray) -> float:
+        A = np.column_stack(cols + [np.ones_like(y)])
+        coef, *_ = np.linalg.lstsq(A, y, rcond=None)
+        return float(np.mean((y - A @ coef) ** 2))
+
+    for k in (0.0, 0.15, 0.3):
+        area, metro, y = flats(k)
+        print(f"9) k = {k:4.2f}: только площадь {lstsq_mse([area], y):.3f}, площадь и метро {lstsq_mse([area, metro], y):.3f}")
+    print("   Без метро его влияние k·метро попадает в остатки и растёт как k²; модель с метро")
+    print("   описывает всю закономерность, остаётся только настоящий шум: ошибка ≈ σ² = 0.25 при любом k.")
+
+
+def task_10() -> None:
+    X_tr, y_tr = datasets.regression_1d(kind="wave", n=40, noise=0.4, seed=11)
+    X_new, y_new = datasets.regression_1d(kind="wave", n=70, noise=0.4, seed=12, x_min=0, x_max=14)
+    inside = X_new[:, 0] <= 10
+    for d in range(1, 9):
+        t = RegressionTree(max_depth=d).fit(X_tr, -y_tr)
+        print(f"10) глубина {d}: обучение {mse(y_tr, t.predict(X_tr)):.3f}, x ≤ 10: {mse(y_new[inside], t.predict(X_new[inside])):.3f}, "
+              f"x > 10: {mse(y_new[~inside], t.predict(X_new[~inside])):.3f}")
+    print("   Справа от 10 прогноз дерева — значение одного крайнего листа, какая бы ни была глубина.")
+    print("   Выход: моделировать тренд отдельно (например, прямой) и учить деревья на отклонениях от него.")
+
+
 if __name__ == "__main__":
     task_1()
     task_2()
@@ -95,3 +150,6 @@ if __name__ == "__main__":
     task_5()
     task_6()
     task_7()
+    task_8()
+    task_9()
+    task_10()
