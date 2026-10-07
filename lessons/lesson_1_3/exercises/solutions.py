@@ -125,12 +125,16 @@ def task_4() -> None:
     for e, a, b in zip(eps_list, fwd, cen):
         print(f"   {e:7.0e}   {a:13.1e}   {b:16.1e}")
     best_fwd, best_cen = eps_list[int(np.argmin(fwd))], eps_list[int(np.argmin(cen))]
-    print(f"   «Вперёд» точнее всего при ε = {best_fwd:.0e} (ошибка {min(fwd):.0e}), "
-          f"центральная — при ε = {best_cen:.0e} (ошибка {min(cen):.0e}).")
+    i8 = eps_list.index(1e-8)
+    print(f"   «Вперёд»: ошибка ≈ 3ε вплоть до ε = 10⁻⁷; лучшая — при ε ≈ 10⁻⁸ ({fwd[i8]:.0e}: здесь округление "
+          f"случайно частично погасило ошибку метода 3ε = 3e-08), дальше растёт.")
+    print(f"   Центральная: ошибка ≈ ε², лучшая при ε = {best_cen:.0e} (ошибка {min(cen):.0e}), дальше растёт.")
     print("   Ошибка метода: ≈ 3ε у разности «вперёд», ровно ε² у центральной ((1 ± ε)³ даёт 3 + ε²).")
     print("   Ошибка округления ≈ 10⁻¹⁶/ε: при малом ε разность почти равных чисел теряет значащие цифры.")
     print("   Сумма двух ошибок минимальна при ε ≈ √10⁻¹⁶ = 10⁻⁸ («вперёд») и ε ≈ ∛10⁻¹⁶ ≈ 10⁻⁵…10⁻⁶ (центральная).")
-    assert best_fwd == 1e-8 and min(fwd) < 5e-9
+    assert all(abs(a / (3 * e) - 1) < 0.05 for e, a in zip(eps_list[:i8], fwd[:i8])), "≈ 3ε до ε = 1e-7"
+    assert best_fwd == 1e-8 and fwd[i8] < 3e-8 / 5, "при 1e-8 ошибка заметно меньше 3ε"
+    assert all(a > fwd[i8] for a in fwd[i8 + 1:]), "после 1e-8 ошибка «вперёд» растёт"
     assert best_cen in (1e-5, 1e-6, 1e-7) and min(cen) < 2e-10
     assert abs(fwd[0] - 0.31) < 1e-9 and abs(cen[0] - 0.01) < 1e-9
     assert fwd[-1] > 1e-5 and cen[-1] > 1e-5, "при ε = 1e-12 обе разности хуже, чем при 1e-5"

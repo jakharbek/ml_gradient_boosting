@@ -10,12 +10,18 @@
 квартире и три раунда «свободно ↔ пни».
 
 Каждое число печатается рядом с тем, как оно записано на странице, и сверяется assert-ом с
-точностью до последнего напечатанного знака. Если формулы или текст урока разойдутся, скрипт
-упадёт и назовёт место. Числа виджетов на 12 и 30 точках проверяют соседние примеры
-prediction_descent.py и sgd_batches.py.
+точностью до последнего напечатанного знака. Кроме того, скрипт читает саму страницу
+(lessons/lesson_1_3/web/index.html) и проверяет, что каждая такая запись в ней встречается:
+теги снимаются, «−» заменяется на «-», пробелы нормализуются, числа внутри формул $…$
+учитываются (запись 3·10^{-4} в формуле читается как 3e-4). Если расчёт разойдётся с записью
+или запись исчезнет со страницы, скрипт упадёт и назовёт место. Короткие числа («7», «0»)
+проверяются лишь на присутствие где-то на странице. Числа виджетов на 12 и 30 точках проверяют
+соседние примеры prediction_descent.py и sgd_batches.py.
 """
 
+import html
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -31,6 +37,40 @@ from gbcourse.rng import Mulberry32
 ex = Example(__file__)
 
 CHECKED = [0]  # сколько чисел сверено со страницей
+PAGE = Path(__file__).resolve().parents[1] / "web" / "index.html"
+MISSING: list[tuple[str, str]] = []  # записи, которых нет в тексте страницы
+
+
+def page_numbers(path: Path) -> tuple[set[str], str]:
+    """Числа из текста страницы урока (как строки) и сам текст без пробелов.
+
+    Теги снимаются, «−» → «-»; записи формул 3\\cdot10^{-4} и 10^{-8} становятся 3e-4 и 1e-8.
+    Разделители тысяч («37 700», «37\\,700») учитываются и слитно, и раздельно.
+    """
+    text = re.sub(r"<[^>]+>", " ", path.read_text(encoding="utf-8"))
+    text = html.unescape(text).replace("−", "-")
+    for space in ("\u00a0", "\u2009", "\u202f"):
+        text = text.replace(space, " ")
+    text = re.sub(r"(\d+(?:\.\d+)?)\s*\\cdot\s*10\^\{(-?\d+)\}", r"\1e\2", text)
+    text = re.sub(r"(?<![\d.])10\^\{(-?\d+)\}", r"1e\1", text)
+    joined = re.sub(r"(\d)(?:\\,|\s)(\d{3})(?!\d)", r"\1\2", text)
+    found: set[str] = set()
+    for variant in (text, joined):
+        found |= set(re.findall(r"(?<![\w.])-?\d+(?:\.\d+)?(?:e-?\d+)?", variant))
+    return found, re.sub(r"\s+", "", joined)
+
+
+PAGE_NUMBERS, PAGE_TEXT = page_numbers(PAGE) if PAGE.exists() else (None, "")
+
+
+def on_page(label: str, shown: str) -> None:
+    """Запомнить запись, если её нет в тексте страницы (дроби вида «−1/3» ищутся подстрокой)."""
+    if PAGE_NUMBERS is None:
+        return
+    text = shown.replace("−", "-").replace("+", "").replace(" ", "").replace("%", "")
+    if (text in PAGE_TEXT) if "/" in text else (text in PAGE_NUMBERS):
+        return
+    MISSING.append((label, shown))
 
 
 def agree(label: str, value: float, shown: str, tol: float | None = None,
@@ -52,6 +92,7 @@ def agree(label: str, value: float, shown: str, tol: float | None = None,
             shift = int(power) if power else 0
             tol = 0.5 * 10.0 ** (shift - decimals) + 1e-12 if decimals or shift else 1e-9
     assert abs(value - target) <= tol, f"{label}: получилось {value!r}, на странице {shown}"
+    on_page(label, shown)
     CHECKED[0] += 1
     print(f"  {label:<50s} {value:>13.6g}   стр.: {shown}")
 
@@ -68,6 +109,7 @@ def same_list(label: str, values, shown: list[str], rounded: bool = False) -> No
         decimals = len(text.split(".")[1]) if "." in text else 0
         tol = 0.5 * 10.0**-decimals + 1e-12 if decimals or rounded else 1e-9
         assert abs(v - float(text)) <= tol, f"{label}: получилось {v!r}, на странице {s}"
+        on_page(label, s)
     CHECKED[0] += len(values)
     print(f"  {label:<50s} {', '.join(shown)}")
 
@@ -323,8 +365,8 @@ def descend(d1, t0: float, eta: float, steps: int = 400) -> float:
     return t
 
 
-agree("η = 0.2, старт 0.16 → мелкая яма", descend(dpits, 0.16, 0.2), "1.332")
-agree("η = 0.2, старт 0.14 → глубокая яма", descend(dpits, 0.14, 0.2), "−1.484")
+agree("η = 0.2, старт 0.16 → мелкая яма у θ ≈ 1.33", descend(dpits, 0.16, 0.2), "1.33")
+agree("η = 0.2, старт 0.14 → глубокая яма у θ ≈ −1.48", descend(dpits, 0.14, 0.2), "−1.48")
 agree("плоское дно, старт 2.5, η = 0.2: первый шаг", 2.5 - 0.2 * 2.5**3, "−0.625")
 agree("кривизна θ⁴/4 в 2.5: 3θ²", 3 * 2.5**2, "18.75")
 agree("граница 2/a", 2 / 18.75, "0.107")
@@ -728,7 +770,12 @@ for k, shown in enumerate(table14):
     F65 += NU * (left_k if 65 <= t_k else right_k)  # новая квартира идёт в свой лист
     F_boost = F_boost + NU * h_k
 
-print(f"\nСверено чисел со страницей: {CHECKED[0]} — все совпадают.")
+if PAGE_NUMBERS is None:
+    print(f"\n(Страница {PAGE} не найдена — проверка записей на странице пропущена.)")
+assert not MISSING, f"На странице {PAGE.name} нет записей ({len(MISSING)}):\n" + "\n".join(
+    f"  {label}: «{shown}»" for label, shown in MISSING)
+print(f"\nСверено чисел со страницей: {CHECKED[0]} — все совпадают с расчётом"
+      + ("." if PAGE_NUMBERS is None else f"; каждая сверяемая запись найдена в {PAGE.name}."))
 
 # ═══════════════════════════════ Сводный рисунок ═══════════════════════════════
 fig, axes = plt.subplots(2, 2, figsize=(11, 7.6))
@@ -769,9 +816,9 @@ ax.legend(fontsize=8, loc="lower right")
 
 ax = axes[1, 1]
 ks = np.arange(4)
-ax.plot(ks, [row[0] for row in rounds], color=style.ORANGE, marker="s", ms=6, mec=style.SURFACE,
-        label="свободно: 65 м² навсегда 7")
-ax.plot(ks, [row[3] for row in rounds], color=style.BLUE, marker="o", ms=6, mec=style.SURFACE,
+ax.plot(ks, [row[0] for row in rounds], color=style.ROLE["model_prev"], ls=(0, (5, 3)), marker="s",
+        ms=6, mec=style.SURFACE, label="свободно: 65 м² навсегда 7")
+ax.plot(ks, [row[3] for row in rounds], color=style.ROLE["model"], marker="o", ms=6, mec=style.SURFACE,
         label="через пни: подписи — прогноз 65 м²")
 for k, row in enumerate(rounds[1:], start=1):
     ax.annotate(f"{row[5]:.2f}".rstrip("0").rstrip("."), (k, row[3]), xytext=(6, 8),
