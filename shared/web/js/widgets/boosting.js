@@ -209,7 +209,7 @@
           { type: 'points', x: Xtr, y: r, color: 'data', r: 3.4, label: state.pseudo ? 'псевдо-остатки r_i' : 'остатки y − F_{' + Math.max(0, m - 1) + '}', tooltip: (i) => [{ label: 'x', value: U.fmt(Xtr[i], 3) }, { label: 'остаток', value: U.fmt(r[i], 3) }] },
           tree ? { type: 'steps', segments: tree.segments1d(0, 10), color: 'tree', width: 2.4, label: 'дерево h_{' + m + '}(x)' } : null,
         ];
-        resPlot.setTitle(m > 0 ? 'Итерация ' + m + ': дерево h_' + m + ' приближает остатки' : 'Остатки константы F_0');
+        resPlot.setTitle(m > 0 ? 'Итерация ' + m + ': дерево h_{' + m + '} приближает остатки' : 'Остатки константы F_0');
         resPlot.render(layers);
       }
       if (curvePlot) {

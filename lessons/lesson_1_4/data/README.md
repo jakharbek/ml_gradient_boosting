@@ -11,3 +11,17 @@
 
 - Столбцы: `x`, `y`; строк: 30.
 - Как получить в Python: `datasets.regression_1d(kind='sine', n=30, noise=0.35, seed=1)`
+
+## `sine_40.csv` — Синус: 40 точек для U-кривой
+
+Обучающие данные виджета «Сложность модели»; новые данные — n=400, seed=102.
+
+- Столбцы: `x`, `y`; строк: 40.
+- Как получить в Python: `datasets.regression_1d(kind='sine', n=40, noise=0.35, seed=2)`
+
+## `sine_300.csv` — Синус: 300 точек для ранней остановки
+
+Делятся на обучение и валидацию (train_test_split, test_size=0.3, seed=0); новые данные — n=500, seed=107.
+
+- Столбцы: `x`, `y`; строк: 300.
+- Как получить в Python: `datasets.regression_1d(kind='sine', n=300, noise=0.4, seed=7)`
