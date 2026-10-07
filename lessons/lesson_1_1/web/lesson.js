@@ -4,6 +4,9 @@
  *   data-source  — откуда берутся данные: y = f(x) + ε;
  *   error-table  — ошибка руками: остатки, квадраты, MSE, RMSE, MAE, R²;
  *   manual-fit   — подбор параметров руками и «рельеф ошибки»;
+ *   hidden-feature  — шум или закономерность: что модель видит, зависит от признаков;
+ *   class-threshold — ошибка классификатора: порог, матрица ошибок, доля верных, полнота, точность;
+ *   generalize      — обобщение: «зубрила», интерполяция и экстраполяция;
  *   train-test   — обучение и тест: честная оценка и её разброс. */
 (function () {
   'use strict';
@@ -12,6 +15,13 @@
   /** Формула KaTeX как элемент; до загрузки KaTeX — текст. */
   const tex = (src) => GBC.math.tex(src);
   const signed = (v, d = 3) => (v > 0 ? '+' : '') + U.fmt(v, d);
+  /** Русское склонение: plural(1, 'тревога', 'тревоги', 'тревог') → «1 тревога». */
+  const plural = (n, one, few, many) => {
+    const m10 = n % 10;
+    const m100 = n % 100;
+    const w = m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+    return n + ' ' + w;
+  };
 
   /* ------------------------------------------------ шесть квартир (как в уроке 1) */
   const FLATS = {
@@ -634,6 +644,401 @@
         model.split('\n').map((l) => '    ' + l).join('\n') + '\n' +
         '    test_mse.append(mse(yte, predict(Xte)))\n    if seed == ' + s.seed + ':\n        print("seed ' + s.seed + ': обучение", mse(ytr, predict(Xtr)), " тест", test_mse[-1])\n' +
         'print(f"тест по 30 разбиениям: от {min(test_mse):.3f} до {max(test_mse):.3f}, среднее {np.mean(test_mse):.3f}")\n';
+    });
+    sync();
+    draw();
+  });
+  /* =================================================================================
+   * hidden-feature — что шум, а что закономерность, зависит от признаков
+   * ================================================================================= */
+  /** Наименьшие квадраты для F = c0·col0 + c1·col1 + … + b (нормальные уравнения, метод Гаусса). */
+  function lstsq(cols, y) {
+    const n = y.length;
+    const A = cols.map((c) => c.slice()).concat([new Array(n).fill(1)]);
+    const k = A.length;
+    const M = [];
+    for (let p = 0; p < k; p++) {
+      const row = [];
+      for (let q = 0; q < k; q++) {
+        let s = 0;
+        for (let i = 0; i < n; i++) s += A[p][i] * A[q][i];
+        row.push(s);
+      }
+      let s = 0;
+      for (let i = 0; i < n; i++) s += A[p][i] * y[i];
+      row.push(s);
+      M.push(row);
+    }
+    for (let p = 0; p < k; p++) {
+      let piv = p;
+      for (let r = p + 1; r < k; r++) if (Math.abs(M[r][p]) > Math.abs(M[piv][p])) piv = r;
+      [M[p], M[piv]] = [M[piv], M[p]];
+      for (let r = 0; r < k; r++) {
+        if (r === p) continue;
+        const f = M[r][p] / M[p][p];
+        for (let q = p; q <= k; q++) M[r][q] -= f * M[p][q];
+      }
+    }
+    return M.map((row, p) => row[k] / row[p]);
+  }
+
+  GBC.widget('hidden-feature', (el) => {
+    const s = { n: 60, k: 0.15, noise: 0.5, seed: 3, both: false };
+    const w = ui.shell(el, {
+      title: 'Шум или закономерность? Зависит от признаков',
+      sub: 'Цена квартиры = 0.12·площадь + 3 − k·(минут до метро) + шум ε. Модель «только площадь» не видит метро — и его влияние для неё выглядит шумом. Справа — остатки модели против времени до метро.',
+    });
+    ui.segmented(w.controls, {
+      label: 'Модель знает',
+      options: [{ value: 'one', label: 'Только площадь' }, { value: 'both', label: 'Площадь и метро' }],
+      value: 'one', onChange: (v) => ((s.both = v === 'both'), draw()),
+    });
+    ui.slider(w.controls, { label: 'Влияние метро k, млн за минуту', min: 0, max: 0.3, step: 0.01, value: s.k, format: (v) => U.fmt(v, 2), onInput: (v) => ((s.k = v), draw()) });
+    ui.slider(w.controls, { label: 'Настоящий шум σ', min: 0, max: 1.2, step: 0.05, value: s.noise, format: (v) => U.fmt(v, 2), onInput: (v) => ((s.noise = v), draw()) });
+    ui.slider(w.controls, { label: 'Квартир n', min: 20, max: 300, step: 10, value: s.n, format: String, onInput: (v) => ((s.n = v), draw()) });
+    ui.button(w.controls, { label: 'Новая выборка', small: true, onClick: () => ((s.seed += 1), draw()) });
+    const box = H('div', { class: 'plots-2' });
+    w.main.appendChild(box);
+    const p1 = new GBC.Plot(box, {
+      height: 290, x: { label: 'площадь, м²', domain: [25, 105] }, y: { label: 'цена, млн' },
+      table: () => {
+        const d = gen();
+        return { columns: ['площадь, м²', 'до метро, мин', 'цена, млн'], rows: d.area.map((v, i) => [v, d.metro[i], d.y[i]]) };
+      },
+    });
+    const p2 = new GBC.Plot(box, { height: 290, x: { label: 'до метро, мин', domain: [0, 32] }, y: { label: 'остаток r = y − F(x)' } });
+    const note = w.note('', true);
+    const stats = ui.stats(w.foot, [
+      { key: 'one', label: 'MSE: только площадь' },
+      { key: 'both', label: 'MSE: площадь и метро' },
+      { key: 's2', label: 'Настоящий шум σ²' },
+    ]);
+    /** Порядок вызовов ГПСЧ на квартиру: площадь → метро → шум (как в Python-коде). */
+    function gen() {
+      const rng = new GBC.RNG(s.seed);
+      const area = [];
+      const metro = [];
+      const y = [];
+      for (let i = 0; i < s.n; i++) {
+        const a = rng.uniform(30, 100);
+        const m = rng.uniform(2, 30);
+        const e = rng.normal();
+        area.push(a);
+        metro.push(m);
+        y.push(0.12 * a + 3 - s.k * m + s.noise * e);
+      }
+      return { area, metro, y };
+    }
+    function draw() {
+      const d = gen();
+      const c1 = lstsq([d.area], d.y);
+      const c2 = lstsq([d.area, d.metro], d.y);
+      const F1 = d.area.map((a) => c1[0] * a + c1[1]);
+      const F2 = d.area.map((a, i) => c2[0] * a + c2[1] * d.metro[i] + c2[2]);
+      const F = s.both ? F2 : F1;
+      const r = d.y.map((v, i) => v - F[i]);
+      const mse1 = U.mean(d.y.map((v, i) => (v - F1[i]) ** 2));
+      const mse2 = U.mean(d.y.map((v, i) => (v - F2[i]) ** 2));
+      const ax = [25, 105];
+      const L1 = [];
+      if (s.both) {
+        L1.push({ type: 'line', x: ax, y: ax.map((a) => c2[0] * a + c2[1] * 5 + c2[2]), color: 'model', width: 2.2, label: 'F при 5 мин до метро' });
+        L1.push({ type: 'line', x: ax, y: ax.map((a) => c2[0] * a + c2[1] * 25 + c2[2]), color: 'model-prev', width: 2.2, dash: '6 4', label: 'F при 25 мин' });
+      } else {
+        L1.push({ type: 'line', x: ax, y: ax.map((a) => c1[0] * a + c1[1]), color: 'model', width: 2.2, label: 'F(площадь)' });
+      }
+      L1.push({ type: 'points', x: d.area, y: d.y, color: 'data', r: 4, label: 'квартиры', tooltip: (i) => [{ label: 'площадь', value: U.fmt(d.area[i], 1) + ' м²' }, { label: 'метро', value: U.fmt(d.metro[i], 1) + ' мин' }, { label: 'цена', value: U.fmt(d.y[i], 2) }, { label: 'остаток', value: signed(r[i], 2) }] });
+      p1.render(L1);
+      // тренд остатков по метро: если он есть, это не шум, а неучтённая закономерность
+      const tr = lstsq([d.metro], r);
+      const L2 = [
+        { type: 'hline', y: 0, color: 'axis', width: 1 },
+        { type: 'segments', x1: d.metro, y1: r.map(() => 0), x2: d.metro, y2: r, color: 'residual', opacity: 0.5 },
+        { type: 'points', x: d.metro, y: r, color: 'data', r: 4, label: 'остатки', tooltip: (i) => [{ label: 'метро', value: U.fmt(d.metro[i], 1) + ' мин' }, { label: 'остаток', value: signed(r[i], 2) }] },
+        { type: 'line', x: [0, 32], y: [tr[1], 32 * tr[0] + tr[1]], color: 'tree', width: 2, label: 'тренд остатков' },
+      ];
+      if (s.noise > 0) {
+        L2.push({ type: 'hline', y: s.noise, color: 'ink2', dash: '4 4', width: 1, text: '±σ' });
+        L2.push({ type: 'hline', y: -s.noise, color: 'ink2', dash: '4 4', width: 1 });
+      }
+      const lim = Math.max(1, ...r.map(Math.abs)) * 1.1;
+      p2.render(L2, { y: [-lim, lim] });
+      stats.set('one', U.fmt(mse1, 3));
+      stats.set('both', U.fmt(mse2, 3));
+      stats.set('s2', U.fmt(s.noise * s.noise, 3));
+      note.innerHTML = s.both
+        ? 'Модель видит метро: остатки справа больше не зависят от времени до метро (тренд почти горизонтален), их разброс — около σ. MSE = ' + U.fmt(mse2, 3) + ' — близко к настоящему шуму σ² = ' + U.fmt(s.noise * s.noise, 3) + '. Лучше уже не сделать: оставшееся — по-настоящему непредсказуемое.'
+        : 'Модель знает только площадь. Остатки справа <b>падают</b> с ростом времени до метро: это закономерность, а не шум, — просто модели её не показали. MSE = ' + U.fmt(mse1, 3) + ', хотя настоящий шум σ² = ' + U.fmt(s.noise * s.noise, 3) + '. Переключите модель на «Площадь и метро».';
+    }
+    w.pythonAction(() =>
+      'import numpy as np\nfrom gbcourse.rng import Mulberry32\n\n' +
+      'rng = Mulberry32(' + s.seed + ')\nrows = []\nfor _ in range(' + s.n + '):\n    area = rng.uniform(30, 100)\n    metro = rng.uniform(2, 30)\n    eps = rng.normal()\n' +
+      '    rows.append((area, metro, 0.12 * area + 3 - ' + U.pyNum(s.k) + ' * metro + ' + U.pyNum(s.noise) + ' * eps))\n' +
+      'area, metro, y = np.array(rows).T\n\n' +
+      'for name, cols in [("только площадь", [area]), ("площадь и метро", [area, metro])]:\n' +
+      '    A = np.column_stack(cols + [np.ones_like(y)])\n    coef, *_ = np.linalg.lstsq(A, y, rcond=None)\n' +
+      '    print(f"{name:16s} MSE = {np.mean((y - A @ coef) ** 2):.3f}   коэффициенты: {np.round(coef, 3)}")\n' +
+      'print("настоящий шум σ² =", ' + U.pyNum(s.noise) + ' ** 2)\n'
+    );
+    draw();
+  });
+
+  /* =================================================================================
+   * class-threshold — ошибка классификатора: порог, матрица ошибок, доля верных
+   * ================================================================================= */
+  const CREDIT = {
+    x: [12, 18, 25, 30, 34, 41, 47, 52, 58, 63, 71, 80],
+    y: [0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1],
+  };
+  /** 48 обычных операций (floor(uniform(5, 75)), seed = 4) и 2 мошеннические: 61.5 и 86.5. */
+  function fraudData() {
+    const rng = new GBC.RNG(4);
+    const pts = [];
+    for (let i = 0; i < 48; i++) pts.push([Math.floor(rng.uniform(5, 75)), 0]);
+    pts.push([61.5, 1], [86.5, 1]);
+    pts.sort((a, b) => a[0] - b[0]);
+    return { x: pts.map((p) => p[0]), y: pts.map((p) => p[1]) };
+  }
+  GBC.widget('class-threshold', (el) => {
+    const SETS = {
+      credit: Object.assign({ feat: 'платежи по кредитам, % дохода', c0: 'вернул', c1: 'не вернул', t: 50 }, CREDIT),
+      fraud: Object.assign({ feat: 'подозрительность операции, баллы', c0: 'обычная', c1: 'мошенничество', t: 101 }, fraudData()),
+    };
+    const s = { set: 'credit', t: 50 };
+    const D = () => SETS[s.set];
+    const w = ui.shell(el, {
+      title: 'Ошибка классификатора: порог и матрица ошибок',
+      sub: 'Правило: «если признак ≥ t — прогноз „класс 1“». Перетащите вертикальную линию порога. Точки с чёрным кольцом — ошибки модели.',
+    });
+    ui.segmented(w.controls, {
+      label: 'Данные',
+      options: [{ value: 'credit', label: '12 заёмщиков' }, { value: 'fraud', label: '50 операций' }],
+      value: s.set, onChange: (v) => ((s.set = v), setT(D().t)),
+    });
+    const tCtl = ui.slider(w.controls, { label: 'Порог t', min: 0, max: 101, step: 0.5, value: s.t, format: (v) => (v > 100 ? 'выше всех' : U.fmt(v, 1)), onInput: (v) => ((s.t = v), draw()) });
+    const presets = H('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } });
+    w.controls.appendChild(presets);
+    ui.button(presets, { label: 'Всем «класс 0»', small: true, onClick: () => setT(101) });
+    ui.button(presets, { label: 'Лучший порог', small: true, kind: 'primary', onClick: () => setT(bestT()) });
+    const plot = new GBC.Plot(w.main, {
+      height: 230, x: { label: 'признак x' }, y: { label: 'класс' },
+      table: () => ({ columns: ['x', 'класс y', 'прогноз', 'верно?'], rows: D().x.map((v, i) => [v, D().y[i], pred(v), pred(v) === D().y[i] ? 'да' : 'нет']) }),
+    });
+    const cm = H('div', { style: { display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start', marginTop: '8px' } });
+    w.main.appendChild(cm);
+    const note = w.note('', true);
+    const stats = ui.stats(w.foot, [
+      { key: 'acc', label: 'Доля верных (accuracy)' },
+      { key: 'base', label: 'Базовая: всем частый класс' },
+      { key: 'rec', label: 'Полнота: поймано из класса 1' },
+      { key: 'prec', label: 'Точность: верно среди «1»' },
+    ]);
+    const pred = (v) => (v >= s.t ? 1 : 0);
+    function setT(t) {
+      s.t = t;
+      tCtl.set(t);
+      draw();
+    }
+    function counts(t) {
+      const d = D();
+      const c = { tp: 0, fp: 0, fn: 0, tn: 0 };
+      d.x.forEach((v, i) => {
+        const p = v >= t ? 1 : 0;
+        if (p === 1 && d.y[i] === 1) c.tp++;
+        else if (p === 1) c.fp++;
+        else if (d.y[i] === 1) c.fn++;
+        else c.tn++;
+      });
+      return c;
+    }
+    /** Порог с наибольшей долей верных: перебираем середины между соседними значениями. */
+    function bestT() {
+      const xs = [...new Set(D().x)].sort((a, b) => a - b);
+      const cand = [xs[0]].concat(xs.slice(1).map((v, i) => (v + xs[i]) / 2), [101]);
+      let best = cand[0];
+      let bestAcc = -1;
+      for (const t of cand) {
+        const c = counts(t);
+        const acc = c.tp + c.tn;
+        if (acc > bestAcc) (bestAcc = acc), (best = t);
+      }
+      return Math.round(best * 2) / 2;
+    }
+    function draw() {
+      const d = D();
+      const n = d.x.length;
+      // одинаковые x раздвигаем по вертикали, чтобы точки не слипались
+      const seen = {};
+      const yy = d.x.map((v, i) => {
+        const key = d.y[i] + ':' + v;
+        seen[key] = (seen[key] || 0) + 1;
+        return d.y[i] + (seen[key] - 1) * 0.12;
+      });
+      const wrong = new Set(d.x.map((v, i) => i).filter((i) => pred(d.x[i]) !== d.y[i]));
+      const idx0 = U.range(n).filter((i) => d.y[i] === 0);
+      const idx1 = U.range(n).filter((i) => d.y[i] === 1);
+      const sub = (idx, arr) => idx.map((i) => arr[i]);
+      const hl = (idx) => new Set(idx.map((i, k) => (wrong.has(i) ? k : -1)).filter((k) => k >= 0));
+      const tip = (idx) => (k) => {
+        const i = idx[k];
+        return [{ label: 'x', value: U.fmt(d.x[i], 1) }, { label: 'на самом деле', value: d.y[i] ? d.c1 : d.c0 }, { label: 'прогноз', value: pred(d.x[i]) ? d.c1 : d.c0 }];
+      };
+      const tt = Math.min(s.t, 100);
+      plot.opts.x.label = d.feat;
+      plot.render([
+        { type: 'vband', x0: tt, x1: 100, color: 'class1', opacity: 0.1 },
+        { type: 'text', x: Math.min(tt + 1, 97), y: 1.42, text: s.t > 100 ? '' : 'прогноз «' + d.c1 + '» →' },
+        { type: 'points', x: sub(idx0, d.x), y: sub(idx0, yy), color: 'class0', r: 6, label: 'класс 0: ' + d.c0, highlight: hl(idx0), tooltip: tip(idx0) },
+        { type: 'points', x: sub(idx1, d.x), y: sub(idx1, yy), color: 'class1', r: 6, shape: 'square', label: 'класс 1: ' + d.c1, highlight: hl(idx1), tooltip: tip(idx1) },
+        { type: 'vline', x: tt, color: 'ink', width: 2, dash: '5 3', draggable: true, onDrag: (v) => ((s.t = Math.round(U.clamp(v, 0, 100) * 2) / 2), tCtl.set(s.t), draw()) },
+      ], { x: [0, 100], y: [-0.5, 1.6] });
+      // матрица ошибок
+      const c = counts(s.t);
+      const cell = (v, ok, name) => H('td', { class: 'num', style: { background: ok ? 'var(--good-soft)' : 'var(--warn-soft)', fontWeight: 650, minWidth: '92px' } }, String(v), H('br'), H('span', { class: 'muted', style: { fontWeight: 400, fontSize: '0.85em' } }, name));
+      const t = H('table', { class: 'data' },
+        H('thead', null, H('tr', null, H('th', null, 'на самом деле ↓ / прогноз →'), H('th', { class: 'num' }, '0: ' + d.c0), H('th', { class: 'num' }, '1: ' + d.c1))),
+        H('tbody', null,
+          H('tr', null, H('th', null, '0: ' + d.c0), cell(c.tn, true, 'верно (TN)'), cell(c.fp, false, 'ложная тревога (FP)')),
+          H('tr', null, H('th', null, '1: ' + d.c1), cell(c.fn, false, 'пропуск (FN)'), cell(c.tp, true, 'попадание (TP)'))));
+      cm.replaceChildren(H('div', { class: 'table-wrap', style: { margin: 0 } }, t));
+      const acc = (c.tp + c.tn) / n;
+      const n1 = c.tp + c.fn;
+      const base = Math.max(n1, n - n1) / n;
+      const rec = n1 ? c.tp / n1 : NaN;
+      const prec = c.tp + c.fp ? c.tp / (c.tp + c.fp) : NaN;
+      const pct = (v) => (Number.isNaN(v) ? '—' : U.fmt(100 * v, 1) + ' %');
+      stats.set('acc', (c.tp + c.tn) + ' из ' + n + ' = ' + pct(acc));
+      stats.set('base', pct(base));
+      stats.set('rec', c.tp + ' из ' + n1 + ' = ' + pct(rec));
+      stats.set('prec', c.tp + c.fp ? c.tp + ' из ' + (c.tp + c.fp) + ' = ' + pct(prec) : '— (никого не назвали «1»)');
+      let msg = 'Ошибок: ' + (c.fp + c.fn) + ' — ' + plural(c.fp, 'ложная тревога', 'ложные тревоги', 'ложных тревог') + ' и ' + plural(c.fn, 'пропуск', 'пропуска', 'пропусков') + '. ';
+      if (acc <= base + 1e-9) msg += '<b>Доля верных не выше базовой</b> (' + pct(base) + '): правило «всем частый класс» не хуже. ';
+      else msg += 'Это лучше базовой модели «всем частый класс» (' + pct(base) + '). ';
+      if (s.set === 'fraud') msg += 'Классы несбалансированы: 48 обычных операций и 2 мошеннические. Модель «всё обычное» верна в 96 % случаев, но не ловит ни одного мошенника — доля верных здесь обманывает, смотрите на полноту и точность.';
+      else msg += 'Сдвигая порог, вы меняете ошибки одного вида на ошибки другого: ниже порог — больше ложных тревог, выше — больше пропусков.';
+      note.innerHTML = msg;
+    }
+    w.pythonAction(() => {
+      const d = D();
+      const data = s.set === 'credit'
+        ? 'x = np.array(' + JSON.stringify(d.x) + ')   # ' + d.feat + '\ny = np.array(' + JSON.stringify(d.y) + ')    # 1 — ' + d.c1 + '\n'
+        : 'from gbcourse.rng import Mulberry32\n\nrng = Mulberry32(4)\nx = [int(rng.uniform(5, 75)) for _ in range(48)] + [61.5, 86.5]   # ' + d.feat + '\ny = [0] * 48 + [1, 1]                                            # 1 — мошенничество\norder = np.argsort(x, kind="stable")\nx, y = np.array(x)[order], np.array(y)[order]\n';
+      return 'import numpy as np\nfrom sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score\n\n' + data +
+        't = ' + U.pyNum(s.t) + '\npred = (x >= t).astype(int)              # правило: признак ≥ t → класс 1\n\n' +
+        'print("матрица ошибок [[TN, FP], [FN, TP]]:\\n", confusion_matrix(y, pred, labels=[0, 1]))\n' +
+        'print("доля верных:", accuracy_score(y, pred))\nprint("базовая (всем частый класс):", max(y.mean(), 1 - y.mean()))\n' +
+        'print("полнота:", recall_score(y, pred, zero_division=0), " точность:", precision_score(y, pred, zero_division=0))\n';
+    });
+    draw();
+  });
+
+  /* =================================================================================
+   * generalize — обобщение: зубрила, интерполяция и экстраполяция
+   * ================================================================================= */
+  GBC.widget('generalize', (el) => {
+    const train = GBC.datasets.regression1d({ kind: 'wave', n: 40, noise: 0.4, seed: 11 });
+    const fresh = GBC.datasets.regression1d({ kind: 'wave', n: 70, noise: 0.4, seed: 12, xMin: 0, xMax: 14 });
+    const XMAX = 10;
+    const s = { model: 'nn', depth: 3, fresh: true, truth: false };
+    const w = ui.shell(el, {
+      title: 'Обобщение: внутри и за пределами знакомого',
+      sub: 'Модель обучена на 40 синих точках с x от 0 до 10 (затенённая область). Бирюзовые квадраты — 70 новых объектов из того же источника, в том числе с x от 10 до 14, где модель не видела ни одного примера.',
+    });
+    ui.select(w.controls, {
+      label: 'Модель',
+      options: [
+        { value: 'nn', label: '«Зубрила» (сосед)' },
+        { value: 'const', label: 'Константа' },
+        { value: 'line', label: 'Прямая' },
+        { value: 'tree', label: 'Дерево' },
+        { value: 'gb', label: 'Бустинг (100 деревьев)' },
+      ],
+      value: s.model, onChange: (v) => ((s.model = v), sync(), draw()),
+    });
+    const dCtl = ui.slider(w.controls, { label: 'Глубина дерева', min: 1, max: 8, step: 1, value: s.depth, format: String, onInput: (v) => ((s.depth = v), draw()) });
+    ui.toggle(w.controls, { label: 'Новые объекты', checked: s.fresh, onChange: (v) => ((s.fresh = v), draw()) });
+    ui.toggle(w.controls, { label: 'Истинная f(x)', checked: s.truth, onChange: (v) => ((s.truth = v), draw()) });
+    const sync = () => (dCtl.el.hidden = s.model !== 'tree');
+    const plot = new GBC.Plot(w.main, {
+      height: 320, x: { label: 'x', domain: [0, 14] }, y: { label: 'y', domain: [-1.6, 6.6] },
+      table: () => ({ columns: ['x', 'y', 'прогноз', 'область'], rows: fresh.x.map((v, i) => [v, fresh.y[i], model()(v), v <= XMAX ? 'знакомая' : 'новая']) }),
+    });
+    const note = w.note('', true);
+    const stats = ui.stats(w.foot, [
+      { key: 'tr', label: 'MSE на обучении' },
+      { key: 'in', label: 'Новые, x ≤ 10' },
+      { key: 'out', label: 'Новые, x > 10' },
+    ]);
+    const f = (x) => GBC.datasets.trueFunction('wave', x);
+    let cached = null;
+    function model() {
+      const key = s.model + ':' + s.depth;
+      if (cached && cached.key === key) return cached.fn;
+      let fn;
+      if (s.model === 'nn') {
+        fn = (v) => {
+          let bi = 0;
+          for (let i = 1; i < train.x.length; i++) if (Math.abs(train.x[i] - v) < Math.abs(train.x[bi] - v)) bi = i;
+          return train.y[bi];
+        };
+      } else if (s.model === 'const') {
+        const c = U.mean(train.y);
+        fn = () => c;
+      } else if (s.model === 'line') {
+        const [a, b] = lstsq([train.x], train.y);
+        fn = (v) => a * v + b;
+      } else if (s.model === 'tree') {
+        const t = new GBC.RegressionTree({ maxDepth: s.depth }).fit(train.X, train.y.map((v) => -v));
+        fn = (v) => t.predictOne([v]);
+      } else {
+        const g = new GBC.GradientBoosting({ nEstimators: 100, learningRate: 0.1, maxDepth: 2 }).fit(train.X, train.y);
+        fn = (v) => g.predictRawOne([v]);
+      }
+      cached = { key, fn };
+      return fn;
+    }
+    const gx = U.linspace(0, 14, 561);
+    function draw() {
+      const fn = model();
+      const mseOn = (xs, ys) => (xs.length ? U.mean(xs.map((v, i) => (ys[i] - fn(v)) ** 2)) : NaN);
+      const inI = U.range(fresh.x.length).filter((i) => fresh.x[i] <= XMAX);
+      const outI = U.range(fresh.x.length).filter((i) => fresh.x[i] > XMAX);
+      const pick = (idx, arr) => idx.map((i) => arr[i]);
+      const layers = [
+        { type: 'vband', x0: 0, x1: XMAX, color: 'train', opacity: 0.06 },
+        { type: 'text', x: 13.9, y: 6.2, anchor: 'end', text: 'здесь примеров не было' },
+      ];
+      if (s.truth) layers.push({ type: 'line', x: gx, y: gx.map(f), color: 'truth', dash: '6 4', width: 2, label: 'истинная f(x)' });
+      layers.push({ type: 'points', x: train.x, y: train.y, color: 'train', r: 4, label: 'обучение (40)' });
+      if (s.fresh) layers.push({ type: 'points', x: fresh.x, y: fresh.y, color: 'test', r: 4, shape: 'square', label: 'новые объекты (70)', tooltip: (i) => [{ label: 'x', value: U.fmt(fresh.x[i], 2) }, { label: 'y', value: U.fmt(fresh.y[i], 2) }, { label: 'прогноз', value: U.fmt(fn(fresh.x[i]), 2) }] });
+      layers.push({ type: 'line', x: gx, y: gx.map(fn), color: 'model', width: 2.4, curve: s.model === 'line' || s.model === 'const' ? null : 'step', label: 'модель' });
+      plot.render(layers);
+      const tr = U.mean(train.x.map((v, i) => (train.y[i] - fn(v)) ** 2));
+      const mi = mseOn(pick(inI, fresh.x), pick(inI, fresh.y));
+      const mo = mseOn(pick(outI, fresh.x), pick(outI, fresh.y));
+      stats.set('tr', U.fmt(tr, 3));
+      stats.set('in', U.fmt(mi, 3) + ' (' + inI.length + ' точек)');
+      stats.set('out', U.fmt(mo, 3) + ' (' + outI.length + ' точек)');
+      const txt = {
+        nn: '«Зубрила» отвечает ответом ближайшего обучающего примера. Она помнит все ответы, поэтому на обучении ошибка ровно 0. На новых точках она повторяет шум соседа: ошибка около удвоенного шума 2σ² = 0.32. За пределами x = 10 она бесконечно повторяет ответ последнего примера.',
+        const: 'Константа одинаково (плохо) работает везде — она ничего не выучила. Это базовая планка.',
+        line: 'Прямая хуже деревьев внутри знакомой области (волну она не видит), зато продолжает общий рост и <b>лучше всех</b> за её пределами: её форма совпадает с трендом данных.',
+        tree: 'Дерево хорошо обобщает внутри области обучения, но справа от x = 10 его прогноз — <b>константа</b> последнего листа: дерево не умеет продолжать тренд (экстраполировать).',
+        gb: 'Бустинг — сумма деревьев, поэтому за пределами знакомой области он тоже «замирает»: внутри — лучший, снаружи — плато. Это свойство всех моделей на деревьях.',
+      }[s.model];
+      note.innerHTML = txt + ' Ошибка на новых точках: внутри ' + U.fmt(mi, 3) + ', снаружи ' + U.fmt(mo, 3) + '.';
+    }
+    w.pythonAction(() => {
+      const m = {
+        nn: 'def predict(X):                                  # «зубрила»: ответ ближайшего примера\n    idx = np.abs(X[:, :1] - Xtr[:, 0]).argmin(axis=1)\n    return ytr[idx]',
+        const: 'predict = lambda X: np.full(len(X), ytr.mean())',
+        line: 'a, b = np.polyfit(Xtr[:, 0], ytr, 1)\npredict = lambda X: a * X[:, 0] + b',
+        tree: 'predict = RegressionTree(max_depth=' + s.depth + ').fit(Xtr, -ytr).predict',
+        gb: 'predict = GBRegressor(n_estimators=100, learning_rate=0.1, max_depth=2).fit(Xtr, ytr).predict',
+      }[s.model];
+      return 'import numpy as np\nfrom gbcourse import datasets, RegressionTree, GBRegressor\nfrom gbcourse.metrics import mse\n\n' +
+        'Xtr, ytr = datasets.regression_1d(kind="wave", n=40, noise=0.4, seed=11)                 # x от 0 до 10\nXnew, ynew = datasets.regression_1d(kind="wave", n=70, noise=0.4, seed=12, x_min=0, x_max=14)\n\n' +
+        m + '\n\ninside = Xnew[:, 0] <= 10\nprint("обучение:", mse(ytr, predict(Xtr)))\nprint("новые, x ≤ 10:", mse(ynew[inside], predict(Xnew[inside])))\nprint("новые, x > 10:", mse(ynew[~inside], predict(Xnew[~inside])))\n';
     });
     sync();
     draw();
