@@ -125,6 +125,74 @@ def task_9() -> None:
     print("   и обе оценки отрицательны: утечка не всегда видна, но всегда искажает оценку.")
 
 
+def task_10() -> None:
+    n, sigma2 = 5, 1.0
+    rng = Mulberry32(10)
+    tr, te = [], []
+    for _ in range(20000):
+        e = np.array([rng.normal() for _ in range(n)])
+        tr.append(np.mean((e - e.mean()) ** 2))
+        te.append((rng.normal() - e.mean()) ** 2)
+    print(f"10) константа, n = {n}: обучение {np.mean(tr):.3f} (формула {sigma2 * (n - 1) / n:.3f}), "
+          f"новый объект {np.mean(te):.3f} (формула {sigma2 * (n + 1) / n:.3f}), разрыв ≈ 2σ²/n = {2 * sigma2 / n:.3f}")
+    assert abs(np.mean(tr) - 0.8) < 0.02 and abs(np.mean(te) - 1.2) < 0.03
+
+
+def task_11() -> None:
+    mu, sigma, n = 0.5, 1.0, 10
+    lam = sigma**2 / mu**2
+    c = n / (n + lam)
+    err = ((1 - c) * mu) ** 2 + c**2 * sigma**2 / n
+    rng = Mulberry32(11)
+    means = np.array([np.mean([mu + sigma * rng.normal() for _ in range(n)]) for _ in range(20000)])
+    sim0 = np.mean((means - mu) ** 2)
+    sim = np.mean((c * means - mu) ** 2)
+    print(f"11) λ* = {lam:.0f}, c* = {c:.3f}: ошибка {err:.4f} (симуляция {sim:.4f}) против {sigma**2 / n:.4f} без сжатия (симуляция {sim0:.4f})")
+    assert abs(err - 0.0714) < 1e-3 and sim < sim0
+
+
+def task_12() -> None:
+    X, y = datasets.regression_1d(kind="sine", n=80, noise=0.4, seed=7)
+    Xt, yt = datasets.regression_1d(kind="sine", n=400, noise=0.4, seed=107)
+    k = 10
+    fold = np.empty(80, dtype=int)
+    fold[Mulberry32(0).permutation(80)] = np.arange(80) % k
+    means, stds = [], []
+    for d in range(1, 11):
+        sc = [mse(y[fold == j], RegressionTree(max_depth=d).fit(X[fold != j], -y[fold != j]).predict(X[fold == j])) for j in range(k)]
+        means.append(np.mean(sc))
+        stds.append(np.std(sc))
+    best = int(np.argmin(means))
+    thr = means[best] + stds[best] / np.sqrt(k)
+    pick = int(np.argmax(np.array(means) <= thr)) + 1
+    test = [mse(yt, RegressionTree(max_depth=d).fit(X, -y).predict(Xt)) for d in (pick, best + 1)]
+    print(f"12) 10 блоков: лучшая глубина {best + 1} (CV {means[best]:.3f}), порог {thr:.3f} → глубина {pick}; "
+          f"на новых данных {test[0]:.3f} против {test[1]:.3f}")
+
+
+def task_13() -> None:
+    from sklearn.model_selection import TimeSeriesSplit
+
+    for slope in (0.03, 0.0):
+        rng = Mulberry32(5)
+        t = np.arange(144)
+        y = np.array([2 + slope * ti + 0.6 * np.sin(2 * np.pi * ti / 12) + 0.3 * rng.normal() for ti in t])
+        X = t.reshape(-1, 1).astype(float)
+        fold = np.empty(120, dtype=int)
+        fold[Mulberry32(0).permutation(120)] = np.arange(120) % 5
+        h = np.arange(120)
+
+        def err(tr, te, X=X, y=y):
+            return mse(y[te], RegressionTree(max_depth=6).fit(X[tr], -y[tr]).predict(X[te]))
+
+        rnd = np.mean([err(h[fold != j], h[fold == j]) for j in range(5)])
+        tsp = np.mean([err(tr, te) for tr, te in TimeSeriesSplit(n_splits=5).split(h)])
+        fut = err(h, np.arange(120, 144))
+        print(f"13) наклон {slope}: случайные блоки {rnd:.3f}, по времени {tsp:.3f}, будущее {fut:.3f}")
+    print("    Без тренда будущее похоже на прошлое, и разрыв между случайной CV и будущим резко сокращается:")
+    print("    главный обман случайных блоков здесь — скрытая экстраполяция тренда.")
+
+
 if __name__ == "__main__":
     task_1()
     task_2()
@@ -135,3 +203,7 @@ if __name__ == "__main__":
     task_7()
     task_8()
     task_9()
+    task_10()
+    task_11()
+    task_12()
+    task_13()
