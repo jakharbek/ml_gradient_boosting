@@ -145,7 +145,7 @@
       let s;
       if (ax !== 0 && (ax < 1e-3 || ax >= 1e6)) s = x.toExponential(Math.max(1, digits - 1));
       else s = Number(x.toFixed(digits)).toString();
-      return s.replace('-', '−');
+      return s.replace(/-/g, '−');
     },
     fmtFixed(x, digits = 2) {
       if (x === null || x === undefined || Number.isNaN(x)) return '—';

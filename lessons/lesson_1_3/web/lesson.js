@@ -26,11 +26,11 @@
   const sigmoid = (z) => U.sigmoid(z);
   const FUNCS = {
     parabola: { label: 'Парабола ½·3θ²', f: (t) => 1.5 * t * t, df: (t) => 3 * t, d2f: () => 3, dom: [-3, 3], t0: 2.5, py: ['1.5 * t**2', '3 * t', '3'] },
-    pits: { label: 'Две ямы θ⁴/4 − θ² + 0.3θ', f: (t) => t ** 4 / 4 - t * t + 0.3 * t, df: (t) => t ** 3 - 2 * t + 0.3, d2f: (t) => 3 * t * t - 2, dom: [-2.2, 2.2], t0: 0.5, py: ['t**4 / 4 - t**2 + 0.3 * t', 't**3 - 2 * t + 0.3', '3 * t**2 - 2'] },
+    pits: { label: 'Две ямы', f: (t) => t ** 4 / 4 - t * t + 0.3 * t, df: (t) => t ** 3 - 2 * t + 0.3, d2f: (t) => 3 * t * t - 2, dom: [-2.2, 2.2], t0: 0.5, py: ['t**4 / 4 - t**2 + 0.3 * t', 't**3 - 2 * t + 0.3', '3 * t**2 - 2'] },
     abs: { label: 'Излом |θ| (L1)', f: (t) => Math.abs(t), df: (t) => Math.sign(t), d2f: () => 0, dom: [-3, 3], t0: 2.05, py: ['abs(t)', 'np.sign(t)', '0'] },
     quartic: { label: 'Плоское дно θ⁴/4', f: (t) => (t * t * t * t) / 4, df: (t) => t * t * t, d2f: (t) => 3 * t * t, dom: [-3, 3], t0: 2.5, py: ['t**4 / 4', 't**3', '3 * t**2'] },
     logloss: {
-      label: 'Log-loss константы (30 % единиц)', f: (t) => Math.log1p(Math.exp(t)) - 0.3 * t, df: (t) => sigmoid(t) - 0.3, d2f: (t) => sigmoid(t) * (1 - sigmoid(t)), dom: [-3, 3], t0: 2.5,
+      label: 'Заёмщики (log-loss)', f: (t) => Math.log1p(Math.exp(t)) - 0.3 * t, df: (t) => sigmoid(t) - 0.3, d2f: (t) => sigmoid(t) * (1 - sigmoid(t)), dom: [-3, 3], t0: 2.5,
       py: ['np.log1p(np.exp(t)) - 0.3 * t', '1 / (1 + np.exp(-t)) - 0.3', '(1 / (1 + np.exp(-t))) * (1 - 1 / (1 + np.exp(-t)))'],
     },
   };
@@ -108,6 +108,7 @@
     function reset() {
       const L = LAND[s.land];
       s.path = [L.c0];
+      s.edge = false;
       s.reveal = false;
       fogCtl.set(false);
       plot.opts.x.label = L.x;
@@ -116,7 +117,9 @@
     }
     function move(d, redraw = true) {
       const L = LAND[s.land];
-      const nc = U.clamp(cur() + d, L.dom[0], L.dom[1]);
+      const raw = cur() + d;
+      s.edge = raw < L.dom[0] || raw > L.dom[1];
+      const nc = U.clamp(raw, L.dom[0], L.dom[1]);
       if (s.path.length < 400) s.path.push(nc);
       if (redraw) draw();
     }
@@ -162,13 +165,17 @@
         const d = -s.eta * g;
         msg = 'Правило спуска: сдвиг = −η × наклон = −' + U.fmt(s.eta, 3) + ' · (' + U.fmt(g, 3) + ') = ' + U.fmtSigned(d, 3) + '. Знак наклона выбирает сторону, его величина — длину шага: на крутом склоне шаги длинные, у дна — короткие, и спуск тормозит сам.';
       }
+      if (s.edge) msg = '<b>Точка упёрлась в край области:</b> шаг вынес её за край, и её держит только граница рисунка. ' + (s.mode === 'rule' ? 'Темп больше границы — по правилу спуск разлетается; уменьшите η. ' : '') + msg;
       note.innerHTML = msg;
     }
     w.pythonAction(() => {
       const L = LAND[s.land];
       return 'import numpy as np\n\n' + (s.land === 'flats' ? 'y = np.array([3, 5, 4, 8, 9, 13.])         # цены шести квартир\n' : '') +
-        'f = lambda t: ' + L.py[0] + '\ndf = lambda t: ' + L.py[1] + '\n\nt, eta = ' + U.pyNum(L.c0) + ', ' + U.pyNum(s.eta) + '\nfor k in range(' + Math.max(10, s.path.length - 1) + '):\n' +
-        '    print(f"шаг {k:2d}: θ = {t:7.3f}, высота {f(t):7.3f}, наклон {df(t):+.3f}")\n    t = t - eta * df(t)                   # шаг против наклона\n';
+        'f = lambda t: ' + L.py[0] + '\ndf = lambda t: ' + L.py[1] + '\n\n' +
+        (s.mode === 'self'
+          ? 'path = [' + s.path.map((v) => U.pyNum(Number(v.toFixed(6)))).join(', ') + ']   # ваш путь\nfor k, t in enumerate(path):\n    print(f"шаг {k:2d}: θ = {t:7.3f}, высота {f(t):7.3f}, наклон {df(t):+.3f}")\n'
+          : 't, eta = ' + U.pyNum(L.c0) + ', ' + U.pyNum(s.eta) + '\nfor k in range(' + Math.max(10, s.path.length - 1) + '):\n' +
+            '    print(f"шаг {k:2d}: θ = {t:7.3f}, высота {f(t):7.3f}, наклон {df(t):+.3f}")\n    t = t - eta * df(t)                   # шаг против наклона\n');
     });
     reset();
   });
@@ -202,7 +209,7 @@
         return { columns: ['ε', 'вперёд', 'центральная', 'f′ (формула)', 'ошибка вперёд', 'ошибка центр.'], rows: [1, 0.1, 0.01, 1e-3, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12].map((e) => { const a = fwd(F, s.t, e); const b = cen(F, s.t, e); const d = F.df(s.t); return [e, a, b, d, Math.abs(a - d), Math.abs(b - d)]; }) };
       },
     });
-    const ep = new GBC.Plot(w.main, { height: 220, x: { label: 'ε', type: 'log', domain: [1e-12, 1], format: pow10 }, y: { label: '|ошибка|', type: 'log', domain: [1e-14, 10], format: pow10 }, margin: { left: 58 }, crosshair: true, crosshairTitle: (v) => 'ε = ' + v.toExponential(0) });
+    const ep = new GBC.Plot(w.main, { height: 220, x: { label: 'ε', type: 'log', domain: [1e-12, 1], format: pow10, ticks: [1e-12, 1e-10, 1e-8, 1e-6, 1e-4, 1e-2, 1] }, y: { label: '|ошибка|', type: 'log', domain: [1e-14, 10], format: pow10, ticks: [1e-14, 1e-11, 1e-8, 1e-5, 1e-2, 10] }, margin: { left: 58 }, crosshair: true, crosshairTitle: (v) => 'ε = ' + v.toExponential(0) });
     ep.root.hidden = true;
     const note = w.note('', true);
     const stats = ui.stats(w.foot, [{ key: 'q', label: 'Наклон секущей' }, { key: 'd', label: 'Производная f′' }, { key: 'err', label: 'Ошибка' }]);
@@ -264,22 +271,22 @@
   GBC.widget('gd-trainer', (el) => {
     const TASKS = {
       flats: {
-        label: 'Квартиры, ½·MSE, η = 0.5', eta: 0.5, t0: 0, dom: [-1, 15], name: 'c',
+        label: 'η 0.5 · квартиры, ½·MSE', eta: 0.5, t0: 0, dom: [-1, 15], name: 'c',
         f: (c) => U.mean(FLATS.map((y) => 0.5 * (y - c) ** 2)), df: (c) => c - 7,
         hint: (t) => 'f′(c) = c − 7 = ' + U.fmt(t, 4) + ' − 7', py: ['np.mean(0.5 * (y - t) ** 2)', 't - 7'],
       },
       quad: {
-        label: 'f(θ) = (θ − 3)², η = 0.25', eta: 0.25, t0: 0, dom: [-1, 6], name: 'θ',
+        label: 'η 0.25 · (θ − 3)²', eta: 0.25, t0: 0, dom: [-1, 6], name: 'θ',
         f: (t) => (t - 3) ** 2, df: (t) => 2 * (t - 3),
         hint: (t) => 'f′(θ) = 2(θ − 3) = 2 · (' + U.fmt(t, 4) + ' − 3)', py: ['(t - 3) ** 2', '2 * (t - 3)'],
       },
       over: {
-        label: 'f(θ) = 5θ², η = 0.15', eta: 0.15, t0: 2, dom: [-2.5, 2.5], name: 'θ',
+        label: 'η 0.15 · 5θ²', eta: 0.15, t0: 2, dom: [-2.5, 2.5], name: 'θ',
         f: (t) => 5 * t * t, df: (t) => 10 * t,
         hint: (t) => 'f′(θ) = 10θ = 10 · ' + U.fmt(t, 4), py: ['5 * t ** 2', '10 * t'],
       },
       mae: {
-        label: 'Квартиры, MAE, η = 0.5', eta: 0.5, t0: 0, dom: [-1, 15], name: 'c',
+        label: 'η 0.5 · квартиры, MAE', eta: 0.5, t0: 0, dom: [-1, 15], name: 'c',
         f: (c) => U.mean(FLATS.map((y) => Math.abs(y - c))), df: (c) => U.mean(FLATS.map((y) => -Math.sign(y - c))),
         hint: (t) => { const lo = FLATS.filter((y) => y < t - 1e-12).length; const hi = FLATS.filter((y) => y > t + 1e-12).length; return 'цен ниже c: ' + lo + ', выше: ' + hi + ' (цена, равная c, не тянет никуда) → f′(c) = (' + lo + ' − ' + hi + ')/6'; },
         py: ['np.mean(np.abs(y - t))', 'np.mean(-np.sign(y - t))'],
@@ -331,7 +338,7 @@
     function prompt() {
       const k = s.rows.length;
       const nm = T().name;
-      qLabel.replaceChildren(GBC.richText(s.stage === 0 ? 'Шаг ' + k + ' из 2 действий: 1) наклон f′(' + nm + '_' + k + ') при ' + nm + '_' + k + ' = ' + U.fmt(s.t, 4) : 'Шаг ' + k + ': 2) ' + nm + '_{' + (k + 1) + '} = ' + nm + '_' + k + ' − η·f′(' + nm + '_' + k + ') при η = ' + U.fmt(T().eta, 3)));
+      qLabel.replaceChildren(GBC.richText(s.stage === 0 ? 'Шаг ' + k + ', действие 1 из 2: наклон f′(' + nm + '_' + k + ') при ' + nm + '_' + k + ' = ' + U.fmt(s.t, 4) : 'Шаг ' + k + ', действие 2 из 2: ' + nm + '_{' + (k + 1) + '} = ' + nm + '_' + k + ' − η·f′(' + nm + '_' + k + ') при η = ' + U.fmt(T().eta, 3)));
       inp.value = '';
       fb.textContent = '';
     }
@@ -476,16 +483,17 @@
       ];
       if (Math.abs(mean) > 1e-9) layers.push({ type: 'arrows', x1: [c], y1: [0], x2: [c + scale * mean], y2: [0], color: 'tree', width: 3 });
       layers.push({ type: 'points', x: [c + s.eta * mean], y: [0], color: 'model', r: 5, hollow: true, label: 'c_{k+1} = c_k + η·сила' });
-      layers.push({ type: 'text', items: FLATS.map((y, i) => ({ x: y, y: rows[i], dx: 9, dy: 4, text: 'сила ' + U.fmtSigned(pulls[i], 1) })) });
+      // подпись — над точкой: стрелка силы идёт по самой строке и не перечёркивает её
+      layers.push({ type: 'text', items: FLATS.map((y, i) => ({ x: y, y: rows[i], dx: 0, dy: -9, anchor: 'middle', text: 'сила ' + U.fmtSigned(pulls[i], 1) })) });
       if (Math.abs(mean) > 1e-9) layers.push({ type: 'text', items: [{ x: c + scale * mean, y: 0, dx: mean > 0 ? 8 : -8, dy: 4, anchor: mean > 0 ? 'start' : 'end', text: '−f′(c) = ' + U.fmtSigned(mean, 2) }] });
       top.render(layers);
       const gc = U.linspace(-1.5, 16, 300);
-      const vis = cs.slice(0, s.k + 1);
+      const vis = cs.slice(0, s.k + 1).filter((v) => v >= -1.5 && v <= 16);
       bottom.render([
         { type: 'line', x: gc, y: gc.map(L.f), color: 'model', width: 2.2, label: 'f(c) = ' + L.label },
         { type: 'line', x: vis, y: vis.map(L.f), color: 'ink2', width: 1, dash: '3 3', hover: false },
-        { type: 'points', x: vis, y: vis.map(L.f), color: (i) => (i === s.k ? 'tree' : 'ink'), r: (i) => (i === s.k ? 6 : 3.5), label: 'путь спуска' },
-      ]);
+        { type: 'points', x: vis, y: vis.map(L.f), color: (i) => (i === vis.length - 1 && vis[i] === c ? 'tree' : 'ink'), r: (i) => (i === vis.length - 1 && vis[i] === c ? 6 : 3.5), label: 'путь спуска' },
+      ], { x: [-1.5, 16], y: s.loss === 'l2' ? [0, 50] : [0, 10] });
       stats.set('c', U.fmt(c, 4));
       stats.set('pull', U.fmtSigned(mean, 4));
       stats.set('f', U.fmt(L.f(c), 4));
@@ -493,11 +501,11 @@
       note.innerHTML = s.loss === 'l2'
         ? 'Сила каждой квартиры равна её остатку: чем дальше цена, тем сильнее тянет. Средняя сила ȳ − c = 7 − c, поэтому шаг c ← c + η·(7 − c) умножает расстояние до среднего на (1 − η). ' +
           (s.eta > 2 + 1e-9 ? '<b>η > 2 — разнос: каждый шаг перелетает всё дальше.</b>' : Math.abs(s.eta - 2) < 1e-9 ? '<b>η = 2: множитель −1 — точка вечно качается между ' + U.fmt(s.c0, 1) + ' и ' + U.fmt(14 - s.c0, 1) + ', не приближаясь.</b>' : s.eta > 1 + 1e-9 ? 'При 1 < η < 2 точка перелетает среднее, но приближается.' : Math.abs(s.eta - 1) < 1e-9 ? 'При η = 1 — сразу в среднее.' : '') +
-          ' Это и есть «бустинг одного числа» из урока 1.'
+          ' Это и есть «бустинг одного числа» из урока 1.' + (c < -1.5 || c > 16 ? ' <b>Точка улетела за край графика: c = ' + U.fmt(c, 4) + '.</b>' : '')
         : 'Для MAE каждая квартира тянет с силой ±1 (стрелки на рисунке удлинены в 1.6 раза), как бы далеко ни была: дорогая квартира за 13 млн тянет не сильнее квартиры за 8. Равновесие — там, где сил вверх и вниз поровну. При чётном числе квартир это целый отрезок [5, 8]: внутри него средняя сила равна нулю, и спуск останавливается в первой точке, куда попал. Медиана из учебника, 6.5, — лишь середина этого отрезка.';
     }
     w.pythonAction(() =>
-      'import numpy as np\n\ny = np.array([3, 5, 4, 8, 9, 13.])\nc, eta = ' + U.pyNum(s.c0) + ', ' + U.pyNum(s.eta) + '\nfor k in range(' + Math.max(s.k, 1) + '):\n' +
+      'import numpy as np\n\ny = np.array([3, 5, 4, 8, 9, 13.])\nc, eta = ' + U.pyNum(s.c0) + ', ' + U.pyNum(s.eta) + '\nfor k in range(' + s.k + '):\n' +
       '    pull = ' + (s.loss === 'l2' ? 'y - c                     # сила квартиры для ½·MSE: остаток' : 'np.sign(y - c)            # сила для MAE: знак остатка') + '\n' +
       '    print(f"k = {k:2d}: c = {c:.4f}, средняя сила = {pull.mean():+.4f}")\n    c = c + eta * pull.mean()       # шаг против производной: −f′(c) = средняя сила\nprint(f"после спуска: c = {c:.4f}")\n'
     );
@@ -511,7 +519,7 @@
     const half = (c) => U.mean(FLATS.map((y) => 0.5 * (y - c) ** 2));
     const FN = {
       flats: { label: 'Квартиры, ½·MSE', f: half, df: (c) => c - 7, d2f: () => 1, dom: [-2, 16], t: 0, etaMax: 2.5, py: ['np.mean(0.5 * (y - t) ** 2)', 't - y.mean()', '1'] },
-      logloss: { ...FUNCS.logloss, label: 'Log-loss (30 % единиц)', dom: [-3, 3], t: 0, etaMax: 14 },
+      logloss: { ...FUNCS.logloss, label: 'Заёмщики (log-loss)', dom: [-3, 3], t: 0, etaMax: 14 },
       quartic: { ...FUNCS.quartic, label: 'Плоское дно θ⁴/4', dom: [-2, 2], t: 1.5, etaMax: 1.1 },
     };
     const s = { fn: 'flats', t: 0, eta: 0.1 };
@@ -562,7 +570,20 @@
         if (ok && start === null) start = e;
         if ((!ok || i === etas.length - 1) && start !== null) bands.push({ type: 'vband', x0: start, x1: e, color: 'good', opacity: 0.1 }), (start = null);
       });
-      const best = etas[U.argmax(after.map((v) => -v))];
+      // лучший темп: минимум по сетке, уточнённый тернарным поиском между соседними узлами
+      let best = etas[U.argmax(after.map((v) => -v))];
+      {
+        const h = F.etaMax / 399;
+        let a = Math.max(0, best - h);
+        let b = Math.min(F.etaMax, best + h);
+        for (let i = 0; i < 60; i++) {
+          const m1 = a + (b - a) / 3;
+          const m2 = b - (b - a) / 3;
+          if (F.f(t - m1 * g) < F.f(t - m2 * g)) b = m2;
+          else a = m1;
+        }
+        best = (a + b) / 2;
+      }
       // правая граница зелёной зоны: последний темп, при котором функция ещё уменьшилась
       let edge = 0;
       etas.forEach((e, i) => {
@@ -595,8 +616,13 @@
       const lead = s.fn === 'flats'
         ? 'Для параболы всё считается точно: f(θ − η·f′) = f(θ) − η·(1 − η·a/2)·f′², где a = f″ = 1. Выигрыш положителен при 0 < η < 2/a = 2 и максимален при η = 1/a = 1. '
         : s.fn === 'logloss'
-          ? 'Кривизна log-loss мала (f″ ≤ 0.25), поэтому касательная «верна» долго: из θ = ' + U.fmt(t, 2) + ' функция уменьшается при темпах примерно до ' + U.fmt(edge, 1) + ', а лучший темп ≈ ' + U.fmt(best, 2) + ' — между 1/f″ в этой точке (' + U.fmt(1 / F.d2f(t), 2) + ') и у дна (1/0.21 ≈ 4.76). Лемма о спуске гарантирует уменьшение при η < 2/0.25 = 8 из любой точки. '
+          ? 'Кривизна log-loss мала (f″ ≤ 0.25), поэтому касательная «верна» долго: из θ = ' + U.fmt(t, 2) + ' функция уменьшается при темпах ' + (edge >= F.etaMax - 1e-9 ? 'по крайней мере до ' + U.fmt(F.etaMax, 1) + ' (край графика)' : 'примерно до ' + U.fmt(edge, 1)) + ', а лучший темп ≈ ' + U.fmt(best, 2) + ' — между 1/f″ в этой точке (' + U.fmt(1 / F.d2f(t), 2) + ') и у дна (1/0.21 ≈ 4.76). Лемма о спуске гарантирует уменьшение при η < 2/0.25 = 8 из любой точки. '
           : 'У θ⁴/4 кривизна быстро растёт при удалении от нуля: касательная врёт уже на небольших шагах. ';
+      if (Math.abs(g) < 1e-9) {
+        stats.set('best', '—');
+        note.innerHTML = '<b>f′ = 0 — стационарная точка:</b> касательная горизонтальна, шаг спуска ничего не меняет при любом η. Сдвиньте точку θ.';
+        return;
+      }
       note.innerHTML = lead + (fe > f0 + 1e-12
         ? '<b>При η = ' + U.fmt(eta, 2) + ' функция выросла</b>: шаг улетел туда, где касательная уже не похожа на функцию.'
         : 'При η = ' + U.fmt(eta, 2) + ' касательная обещала ' + U.fmt(eta * g * g, 3) + ', получили ' + U.fmt(f0 - fe, 3) + '. Чем меньше η, тем точнее обещание: при малом шаге выигрыш ≈ η·f′².');
@@ -663,8 +689,10 @@
       stats.set('n', n === Infinity ? 'никогда' : String(n));
       stats.set('best', U.fmt(1 / s.a, 3));
       stats.set('lim', U.fmt(2 / s.a, 3));
-      note.innerHTML = (bad
-        ? '<b>Расходимость:</b> η ≥ 2/a = ' + U.fmt(2 / s.a, 3) + ', |множитель| ≥ 1, и каждый шаг отбрасывает дальше от минимума (красная зона).'
+      note.innerHTML = (Math.abs(k + 1) < 1e-9
+        ? '<b>Граница η = 2/a = ' + U.fmt(2 / s.a, 3) + ':</b> множитель −1 — вечные качели на том же расстоянии от минимума: точка не приближается и не удаляется.'
+        : bad
+        ? '<b>Расходимость:</b> η > 2/a = ' + U.fmt(2 / s.a, 3) + ', |множитель| > 1, и каждый шаг отбрасывает дальше от минимума (красная зона).'
         : Math.abs(k) < 1e-9
           ? '<b>Идеальный темп η = 1/a:</b> множитель 0 — минимум за один шаг.'
           : k < 0
@@ -673,7 +701,7 @@
         (n !== Infinity && n > 1 ? ' Число шагов: k = ln 0.01 / ln|1 − η·a| = ' + U.fmt(Math.log(0.01) / Math.log(Math.abs(k)), 2) + ' → ' + n + '.' : '');
     }
     w.pythonAction(() =>
-      'import numpy as np\n\na = ' + U.pyNum(s.a) + '                   # кривизна параболы f = a/2·θ²\nfor eta in [0.1 / a, 0.5 / a, 1 / a, 1.5 / a, 1.9 / a, 2.1 / a]:\n    t = 1.0\n    for k in range(1, 201):\n        t = t - eta * a * t        # θ ← θ − η·f′(θ)\n        if abs(t) < 0.01:\n            break\n' +
+      'import numpy as np\n\na = ' + U.pyNum(s.a) + '                   # кривизна параболы f = a/2·θ²\nfor eta in sorted({0.1 / a, 0.5 / a, 1 / a, 1.5 / a, 1.9 / a, 2.1 / a, ' + U.pyNum(s.eta) + '}):   # последний — темп из виджета\n    t = 1.0\n    for k in range(1, 201):\n        t = t - eta * a * t        # θ ← θ − η·f′(θ)\n        if abs(t) < 0.01:\n            break\n' +
       '    print(f"η = {eta:.3f} (η·a = {eta * a:.2f}): множитель {1 - eta * a:+.2f}, " + (f"шагов до 1 %: {k}" if abs(t) < 0.01 else "не сошлось"))\n'
     );
     draw();
@@ -790,10 +818,17 @@
       } else if (s.fn === 'parabola') msg = 'Здесь θ<sub>k+1</sub> = (1 − 3η)·θ<sub>k</sub>. ' + (s.eta >= 2 / 3 ? '<b>η ≥ 2/3: |1 − 3η| ≥ 1 — расходимость.</b>' : s.eta > 1 / 3 ? 'η > 1/3: точка перепрыгивает минимум, но приближается.' : 'Монотонное приближение; η = 1/3 дало бы минимум за один шаг.');
       else if (s.fn === 'abs') msg = 'У |θ| производная всегда ±1: шаг не уменьшается у минимума, и точка «дребезжит» вокруг нуля с размахом η. Так ведут себя абсолютные потери (MAE). Лекарство — затухающий темп (шаг 8).';
       else if (s.fn === 'quartic') msg = 'На плоском дне производная θ³ почти нулевая: спуск резко замедляется. Из θ = 0.1 шаг с η = 0.5 сдвигает точку всего на 0.0005.';
-      else if (s.fn === 'logloss') msg = 'Log-loss константы с 30 % единиц: минимум в логите ln(0.3/0.7) ≈ −0.847. Кривизна здесь мала (f″ ≤ 0.25), поэтому темп η = 1 слишком робок — попробуйте η ≈ 4.';
+      else if (s.fn === 'logloss') msg = 'Заёмщики (шаг 3): log-loss константы, 3 единицы из 10; минимум в логите ln(0.3/0.7) ≈ −0.847. Кривизна здесь мала (f″ ≤ 0.25), поэтому темп η = 1 слишком робок — попробуйте η ≈ 4.';
       else msg = diverged ? 'Спуск ушёл далеко — уменьшите η.' : 'У этой функции две ямы: глобальная у θ ≈ −1.48 (f ≈ −1.43) и локальная у θ ≈ 1.33 (f ≈ −0.59), между ними — горб у θ ≈ 0.15. Спуск скатывается в ту яму, на склоне которой стартовал. Сравните старты 0.16 и 0.14.';
-      if (diverged && s.mode !== 'newton') msg = '<b>Спуск разлетелся:</b> темп больше границы 2/f″ там, где точка оказалась. ' + msg;
-      else if (cycle && s.mode === 'const') msg = '<b>Качели:</b> точка прыгает между двумя значениями и не приближается — темп на границе 2/f″ у дна. ' + msg;
+      const escaped = ts.length < s.steps + 1;
+      if (diverged && s.mode !== 'newton')
+        msg = (escaped
+          ? '<b>Спуск разлетелся: |θ| превысил 10⁶</b> — в реальной задаче здесь уже переполнение, поэтому виджет останавливается. '
+          : '<b>Спуск ушёл далеко:</b> темп больше границы 2/f″ там, где точка оказалась. ') + msg;
+      else if (cycle && s.mode === 'const')
+        msg = (s.fn === 'abs'
+          ? '<b>Дребезг:</b> на изломе наклон не уменьшается, и при любом постоянном η точка скачет с размахом η. '
+          : '<b>Качели:</b> точка прыгает между двумя значениями и не приближается — темп на границе 2/f″ у дна. ') + msg;
       note.innerHTML = msg;
     }
     w.pythonAction(() => {
@@ -805,7 +840,7 @@
         back: '    eta = eta0\n    while f(t - eta * df(t)) > f(t) - 0.5 * eta * df(t) ** 2:\n        eta /= 2                                # поиск с возвратом (Армихо)\n',
         newton: '    h = d2f(t)\n    eta = 1 / h if h > 1e-9 else 0.05        # шаг Ньютона: η = 1/f″ (где f″ > 0)\n',
       }[s.mode];
-      return head + body + '    t = t - eta * df(t)\n    print(f"шаг {k + 1:2d}: η = {eta:.4f}, θ = {t: .6f}, f(θ) = {f(t): .6f}, f′(θ) = {df(t): .2e}")\n';
+      return head + body + '    t = t - eta * df(t)\n    if abs(t) > 1e6:                            # как в виджете: дальше — переполнение\n        print(f"шаг {k + 1:2d}: |θ| > 1e6 — спуск разлетелся")\n        break\n    print(f"шаг {k + 1:2d}: η = {eta:.4f}, θ = {t: .6f}, f(θ) = {f(t): .6f}, f′(θ) = {df(t): .2e}")\n';
     });
     draw();
   });
@@ -888,9 +923,9 @@
     };
     const SCEN = [
       { key: 'good', make: () => ({ curves: [{ y: line(0.6, 40), label: 'потери на обучении', color: 'train' }], x: 'шаг k', py: 'eta, K, B = 0.6, 40, 30' }), more: 'Прямая для 30 точек, полный спуск с η = 0.6: за десяток шагов потери почти дошли до минимума и легли на полку.' },
-      { key: 'big', make: () => ({ curves: [{ y: line(2.1, 40), label: 'потери на обучении', color: 'train' }], x: 'шаг k', py: 'eta, K, B = 2.1, 40, 30' }), more: 'Та же прямая, η = 2.1: кривизна равна 1, граница устойчивости 2/a = 2. Множитель 1 − η = −1.1 по модулю больше 1 — разнос.' },
+      { key: 'big', make: () => ({ curves: [{ y: line(2.1, 12), label: 'потери на обучении', color: 'train' }], x: 'шаг k', py: 'eta, K, B = 2.1, 12, 30' }), more: 'Та же прямая, η = 2.1: кривизна равна 1, граница устойчивости 2/a = 2. Множитель 1 − η = −1.1 по модулю больше 1 — разнос.' },
       { key: 'noise', make: () => ({ curves: [{ y: line(0.3, 60, 1), label: 'потери на всех точках', color: 'train' }], x: 'шаг k', py: 'eta, K, B = 0.3, 60, 1' }), more: 'Та же прямая, но каждый шаг — по одной случайной точке (B = 1), η = 0.3: потери быстро падают, а потом «топчутся» выше минимума.' },
-      { key: 'slow', make: () => ({ curves: [{ y: line(0.03, 40), label: 'потери на обучении', color: 'train' }], x: 'шаг k', py: 'eta, K, B = 0.03, 40, 30' }), more: 'Та же прямая, η = 0.03: каждый шаг сокращает расстояние до минимума лишь на 3 %. За 40 шагов не пройдено и двух третей пути.' },
+      { key: 'slow', make: () => ({ curves: [{ y: line(0.01, 40), label: 'потери на обучении', color: 'train' }], x: 'шаг k', py: 'eta, K, B = 0.01, 40, 30' }), more: 'Та же прямая, η = 0.01: каждый шаг сокращает расстояние до минимума лишь на 1 %. За 40 шагов пройдена только треть пути (осталось 0.99⁴⁰ ≈ 0.67), и кривая почти прямая.' },
       { key: 'overfit', make: () => { const B = boost(); return { curves: [{ y: B.train, label: 'обучение', color: 'train' }, { y: B.valid, label: 'новые данные', color: 'valid' }], x: 'деревьев M', py: null }; }, more: 'Бустинг деревьев глубины 3 с ν = 0.3 на 60 точках волны (данные урока 1). Ошибка на новых данных минимальна около 13 деревьев, дальше растёт: модель подгоняет шум.' },
       { key: 'plateau', make: () => ({ curves: [{ y: saddle(), label: 'f(θ₁, θ₂)', color: 'train' }], x: 'шаг k', py: 'saddle' }), more: 'Функция ½θ₁² + ¼(θ₂² − 1)², старт (1, 0.001), η = 0.1. Сначала спуск быстро скатывается к седлу (0, 0) — потери ложатся на полку около 0.25, а длина градиента к 35-му шагу падает до 0.038. Остановка по малому наклону закончила бы обучение здесь. Но θ₂ понемногу растёт (умножается на 1.1 за шаг), после 60-го шага точка сползает с седла, и потери обваливаются к нулю.' },
       { key: 'kink', make: () => ({ curves: [{ y: kink(), label: 'f(θ) = |θ|', color: 'train' }], x: 'шаг k', py: 'kink' }), more: 'Спуск по |θ| с постоянным η = 0.3 из θ = 2.05: наклон всегда ±1, поэтому шаг не уменьшается у дна, и потери «пилят» между 0.05 и 0.25.' },
@@ -939,7 +974,9 @@
       const C = sc.make();
       const first = C.curves[0].y;
       const ks = U.range(first.length);
-      const top = Math.max(...C.curves.map((c) => c.y[0])) * 1.25;
+      // растущую кривую (разнос) показываем целиком, остальные — от стартового уровня
+      const rising = first[first.length - 1] > first[0];
+      const top = rising ? Math.max(...first) * 1.05 : Math.max(...C.curves.map((c) => c.y[0])) * 1.25;
       const layers = C.curves.map((c) => ({ type: 'line', x: ks, y: c.y.map((v) => (v > 3 * top ? null : v)), color: c.color, width: 2.2, label: c.label }));
       layers.push({ type: 'points', x: ks, y: first.map((v) => (v > 3 * top ? null : v)), color: C.curves[0].color, r: 2.4, legend: false });
       plot.opts.x.label = C.x;
@@ -1107,8 +1144,12 @@
       const F = FN[s.fn];
       const [g1, g2] = F.g(s.a, s.b);
       s.trail.push([s.a, s.b]);
-      s.a = U.clamp(s.a - s.eta * g1, F.dom[0][0], F.dom[0][1]);
-      s.b = U.clamp(s.b - s.eta * g2, F.dom[1][0], F.dom[1][1]);
+      const na = s.a - s.eta * g1;
+      const nb = s.b - s.eta * g2;
+      // упор в край области прячет разнос — запомним, чтобы сказать об этом
+      s.edge = na < F.dom[0][0] || na > F.dom[0][1] || nb < F.dom[1][0] || nb > F.dom[1][1];
+      s.a = U.clamp(na, F.dom[0][0], F.dom[0][1]);
+      s.b = U.clamp(nb, F.dom[1][0], F.dom[1][1]);
       draw();
     }
     const gridCache = {};
@@ -1116,7 +1157,8 @@
       const F = FN[s.fn];
       const [[x0, x1], [y0, y1]] = F.dom;
       // сетка шире видимой области: при equal: true график может расшириться по одной из осей
-      const grid = gridCache[s.fn] || (gridCache[s.fn] = GBC.Plot.grid(F.f, 2 * x0, 2 * x1, 2 * y0, 2 * y1, 140, 110));
+      const R = 1.5 * Math.max(x1 - x0, y1 - y0);
+      const grid = gridCache[s.fn] || (gridCache[s.fn] = GBC.Plot.grid(F.f, (x0 + x1) / 2 - R, (x0 + x1) / 2 + R, (y0 + y1) / 2 - R, (y0 + y1) / 2 + R, 150, 150));
       const seq = GBC.colors.sequential();
       let lo = Infinity;
       let hi = -Infinity;
@@ -1165,11 +1207,12 @@
       stats.set('g1', U.fmt(g1, 3));
       stats.set('g2', U.fmt(g2, 3));
       stats.set('n', U.fmt(gn, 3));
-      let msg = 'Градиент ∇f = (' + U.fmt(g1, 3) + ', ' + U.fmt(g2, 3) + ') — это просто два наклона срезов, записанные вместе. Толстая стрелка — антиградиент −∇f: сумма синей и оранжевой стрелок. Она перпендикулярна линии уровня через точку (чёрная кривая в легенде) — вдоль линии уровня высота не меняется. ';
+      let msg = 'Градиент ∇f = (' + U.fmt(g1, 3) + ', ' + U.fmt(g2, 3) + ') — это просто два наклона срезов, записанные вместе. Толстая стрелка — антиградиент −∇f: сумма синей и оранжевой стрелок. Она перпендикулярна линии уровня через точку (жирная кривая, см. легенду) — вдоль линии уровня высота не меняется. ';
       if (gn < 1e-3) msg = '<b>Градиент равен нулю</b>: оба среза в этой точке горизонтальны. ' + (s.fn === 'saddle' && Math.abs(s.a) < 0.2 ? 'Но это <b>седло</b>: синий срез здесь — вершина, оранжевый — дно. Спуск, попавший точно сюда, остановится; чуть сдвиньтесь по θ₁ — и он скатится в одну из ям.' : 'Это минимум: дно чаши.');
       else if (s.fn === 'tilt') msg += 'Здесь линии уровня — наклонные эллипсы, и антиградиент обычно смотрит <em>не в минимум</em> (0, 0), а поперёк ближайшей линии уровня. Сделайте несколько шагов: путь изгибается.';
       else if (s.fn === 'saddle' && Math.abs(s.a) < 0.35) msg += 'Рядом седло (0, 0): по θ₁ оно — вершина (синий срез выгнут вверх), по θ₂ — дно. Градиент тут мал, и спуск замедляется.';
-      else if (s.fn === 'bowl') msg += 'По θ₂ чаша в 10 раз круче, чем по θ₁, поэтому оранжевая составляющая длиннее, хотя до дна по θ₂ ближе. В точке (1, 1) наклоны срезов 1 и 10, |∇f| = √101 ≈ 10.05 — как в тексте шага.';
+      if (s.edge && s.trail.length) msg = '<b>Точка упёрлась в край карты:</b> темп больше границы для крутого направления, и спуск разлетается — его держит только край области. Уменьшите η. ' + msg;
+      else if (s.fn === 'bowl') msg += 'По θ₂ чаша в 10 раз круче, чем по θ₁, поэтому оранжевая составляющая длиннее, хотя до дна по θ₂ ближе.' + (Math.abs(s.a - 1) < 0.01 && Math.abs(s.b - 1) < 0.01 ? ' В точке (1, 1) наклоны срезов 1 и 10, |∇f| = √101 ≈ 10.05 — как в тексте шага.' : '');
       note.innerHTML = msg;
     }
     w.pythonAction(() => {
@@ -1276,15 +1319,16 @@
       const n = stepsTo(0);
       stats.set('n', String(n));
       stats.set('nm', s.momentum ? String(stepsTo(s.beta)) : 'выкл.');
-      stats.set('lim', U.fmt(2 / s.kappa, 3));
-      stats.set('best', U.fmt(2 / (1 + s.kappa), 3));
+      const sig = (v) => String(Number(v.toPrecision(3)));
+      stats.set('lim', sig(2 / s.kappa));
+      stats.set('best', sig(2 / (1 + s.kappa)));
       const zig = s.eta * s.kappa > 1 && s.eta * s.kappa < 2;
-      note.innerHTML = (Math.abs(s.eta * s.kappa - 2) < 0.02
+      note.innerHTML = (Math.abs(s.eta * s.kappa - 2) < 1e-6
         ? '<b>η·κ = 2: по крутому направлению θ₂ множитель −1 — вечные качели</b>, хотя по пологому θ₁ шаг ещё робок. '
         : s.eta * s.kappa > 2
         ? '<b>η·κ > 2: по крутому направлению θ₂ спуск разлетается</b>, хотя по пологому θ₁ шаг ещё робок. ' + (s.momentum ? 'Инерция расширяет допустимую зону темпов — проверьте, сходится ли теперь.' : '')
         : zig
-          ? 'По θ₂ множитель 1 − η·κ = ' + U.fmt(1 - s.eta * s.kappa, 2) + ' отрицателен — отсюда зигзаг поперёк долины. По θ₁ множитель 1 − η = ' + U.fmt(1 - s.eta, 3) + ' близок к 1 — отсюда медленное движение вдоль неё. '
+          ? 'По θ₂ множитель 1 − η·κ = ' + U.fmt(1 - s.eta * s.kappa, 3) + ' отрицателен — отсюда зигзаг поперёк долины' + (s.eta * s.kappa > 1.9 ? ' (почти у границы −1: зигзаг гаснет медленно, но гаснет)' : '') + '. По θ₁ множитель 1 − η = ' + U.fmt(1 - s.eta, 3) + ' близок к 1 — отсюда медленное движение вдоль неё. '
           : 'По θ₂ спуск монотонный; по θ₁ множитель 1 − η = ' + U.fmt(1 - s.eta, 3) + '. ') +
         ' Отношение кривизн κ называют <b>числом обусловленности</b>: даже с лучшим постоянным темпом 2/(1 + κ) число шагов растёт примерно пропорционально κ. ' +
         (s.momentum ? 'Инерция копит скорость вдоль долины и гасит зигзаг поперёк. При удачных η и β число шагов растёт как √κ, а не как κ: при κ = 100 это десятки шагов вместо сотен.' : 'Включите инерцию: шаг складывается с долей β предыдущего шага.');
@@ -1331,7 +1375,7 @@
     let last = { pa: [], pb: [], mse: () => 0 };
     p1.onClick = (a, b) => ((s.a0 = a), (s.b0 = b), draw());
     const note = w.note('', true);
-    const stats = ui.stats(w.foot, [{ key: 'kappa', label: 'Вытянутость κ' }, { key: 'lim', label: 'Граница η < 2/a_{max}' }, { key: 'n', label: 'Шагов до 0.1 % (лучший η)' }, { key: 'mse', label: '½·MSE сейчас' }, { key: 'opt', label: '½·MSE минимума' }]);
+    const stats = ui.stats(w.foot, [{ key: 'kappa', label: 'Вытянутость κ' }, { key: 'lim', label: 'Граница η: 2 / наибольшая кривизна' }, { key: 'n', label: 'Шагов до 0.1 % (лучший η)' }, { key: 'mse', label: '½·MSE сейчас' }, { key: 'opt', label: '½·MSE минимума' }]);
     function draw() {
       const S = SC[s.sc];
       const u = x.map(S.tr);
@@ -1423,7 +1467,7 @@
       stats.set('mse', U.fmt(mse(a, b), 4));
       stats.set('opt', U.fmt(mse(aOpt, bOpt), 4));
       const diverged = pa.length < s.steps + 1;
-      note.innerHTML = (diverged ? '<b>Темп больше границы 2/a<sub>max</sub> = ' + U.fmt(2 / lmax, 3) + ' (a<sub>max</sub> — наибольшая кривизна рельефа) — спуск разлетается.</b> ' : '') + (s.sc === 'raw'
+      note.innerHTML = (diverged ? '<b>Темп больше границы 2 / (наибольшая кривизна рельефа) = ' + U.fmt(2 / lmax, 3) + ' — спуск разлетается.</b> ' : '') + (s.sc === 'raw'
         ? 'Признак как есть: x̄ ≈ ' + U.fmt(mx, 2) + ' далеко от нуля, поэтому эллипсы не только вытянуты, но и <b>наклонены</b>: чуть больший наклон a и чуть меньший сдвиг b дают почти ту же прямую. Кривизна поперёк долины ≈ ' + U.fmt(lmax, 1) + ', вдоль дна ≈ ' + U.fmt(lmin, 2) + ' — κ ≈ ' + U.fmt(lmax / lmin, 0) + '. Спуск быстро падает в долину и потом медленно ползёт по ней.'
         : s.sc === 'center'
           ? 'После центрирования эллипсы выпрямились (смешанная производная mean(u) = 0), но остались вытянутыми: по a кривизна равна дисперсии x ≈ ' + U.fmt(lmax, 2) + ', по b — 1. κ ≈ ' + U.fmt(lmax / lmin, 1) + '.'
@@ -1602,12 +1646,15 @@
       const m = half(P.a[K], P.b[K]);
       stats.set('m', U.fmt(m, 4));
       stats.set('opt', U.fmt(half(aOpt, bOpt), 4));
-      stats.set('seen', String(K * Math.min(s.B, n)) + ' (' + U.fmt((K * Math.min(s.B, n)) / n, 2) + ' эпох)');
+      const ep = (K * Math.min(s.B, n)) / n;
+      // склонение: 1 эпоха, 2 эпохи, 5 эпох; дробное число — «эпохи»
+      const epWord = !Number.isInteger(ep) ? 'эпохи' : ep % 10 === 1 && ep % 100 !== 11 ? 'эпоха' : [2, 3, 4].includes(ep % 10) && ![12, 13, 14].includes(ep % 100) ? 'эпохи' : 'эпох';
+      stats.set('seen', String(K * Math.min(s.B, n)) + ' (' + U.fmt(ep, 2) + ' ' + epWord + ')');
       stats.set('seed', String(s.seed));
-      note.innerHTML = s.B >= n
+      note.innerHTML = (m > half(P.a[0], P.b[0]) ? '<b>Темп слишком велик:</b> потери выросли (½·MSE = ' + U.fmt(m, 3) + ') — шаги по отдельным точкам раскачивают прямую. Уменьшите η. ' : '') + (s.B >= n
         ? 'Полный спуск: каждый шаг точный, путь гладкий и прямой (линии уровня — окружности). Зато каждый шаг просматривает все 30 точек.'
         : 'Каждый шаг смотрит лишь на ' + s.B + (s.B === 1 ? ' точку' : ' точек') + ': направление «шумное», путь петляет, но в среднем ведёт к минимуму. Вблизи минимума спуск не останавливается, а «топчется» — шум не исчезает, пока темп постоянный. ' +
-          'Уменьшите η или увеличьте B, чтобы облако стало теснее. Шаг с B = 1 в 30 раз дешевле полного — поэтому на больших данных так и делают.';
+          'Уменьшите η или увеличьте B, чтобы облако стало теснее. Шаг с B = 1 в 30 раз дешевле полного — поэтому на больших данных так и делают.');
     }
     w.pythonAction(() =>
       'import numpy as np\nfrom gbcourse import datasets\nfrom gbcourse.rng import Mulberry32\n\nX, y = datasets.regression_1d(kind="linear", n=30, noise=0.6, seed=3)\nz = (X[:, 0] - X[:, 0].mean()) / X[:, 0].std()   # стандартизация\n\n' +
@@ -1759,7 +1806,7 @@
       stats.set('k', String(k));
       note.innerHTML = s.mode === 'free'
         ? 'Свободный спуск по прогнозам — это «бустинг одного числа» для каждой точки отдельно: остаток каждой умножается на (1 − ν) за шаг, и обучающая ошибка падает к нулю. Но правила для <b>новых</b> x нет — там прогноз так и остался F₀, ошибка на новых точках не меняется. Модель лишь запомнила ответы.'
-        : 'Через дерево: шаг тот же — антиградиент (остатки), — но его приближает дерево глубины 2, то есть функция от x. Поправка автоматически переносится на соседние новые точки, и ошибка на них тоже падает — примерно до k = 10, а дальше бустинг начинает подгонять шум и она растёт (ранняя остановка, урок 7.1). Это и есть <b>градиентный бустинг</b>: градиентный спуск, где шаг обобщает дерево.';
+        : 'Через дерево: шаг тот же — антиградиент (остатки), — но его приближает дерево глубины 2, то есть функция от x. Поправка автоматически переносится на соседние новые точки, и ошибка на них тоже падает — примерно до k = ' + best + ' (при ν = ' + U.fmt(s.nu, 2) + '), а дальше бустинг начинает подгонять шум и она растёт (ранняя остановка, урок 7.1). Это и есть <b>градиентный бустинг</b>: градиентный спуск, где шаг обобщает дерево.';
     }
     w.pythonAction(() =>
       'import numpy as np\nfrom gbcourse import datasets, GBRegressor\nfrom gbcourse.metrics import mse\n\n' +
