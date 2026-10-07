@@ -65,6 +65,7 @@
 │           │                  #   markdown + assistant (ИИ-ассистент урока)
 │           ├── widgets/       # общие виджеты: boosting-1d, boosting-2d, hero-demo, loss-explorer, tree-1d
 │           └── generated/     # manifest.js, pybundle.js — создаёт tools/build.py
+├── .github/workflows/pages.yml # публикация курса на GitHub Pages при каждом push в main
 ├── tools/                     # build.py, check.py, qa.py, qa_assistant.py, serve.py, snapshot.py, new_lesson.py
 ├── tests/python/              # pytest: паритет JS↔Python, сверка с scikit-learn/shap
 ├── tests/js/                  # node --test: движок JS, Markdown и логика ИИ-ассистента
