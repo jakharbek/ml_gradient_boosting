@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "shared" / "python"
 import numpy as np
 
 from gbcourse import datasets, get_loss
+from gbcourse.rng import Mulberry32
 
 
 def task_1() -> None:
@@ -91,6 +92,74 @@ def task_7() -> None:
     print("   слишком мал вблизи минимума; Ньютон пересчитывает кривизну на каждом шаге.")
 
 
+def task_8() -> None:
+    y = np.array([3, 5, 4, 8, 9, 13.0])
+    f = lambda c: np.mean(0.5 * (y - c) ** 2)  # noqa: E731
+    g = 0.0 - y.mean()
+    for eta in (0.1, 0.5, 1, 2, 2.5):
+        exact = f(0) - eta * (1 - eta / 2) * g**2
+        print(f"8) η = {eta:<4}: обещание {f(0) - eta * g**2:8.3f}, на самом деле {f(-eta * g):7.3f}, формула {exact:7.3f}")
+    print("   функция уменьшается при 0 < η < 2/a = 2, сильнее всего — при η = 1/a = 1")
+
+
+def task_9() -> None:
+    y = np.array([3, 5, 4, 8, 9, 13.0])
+    for c0 in (0.0, 12.1):  # 12.1, а не 12: путь не попадает точно на цены, где знак остатка — ноль
+        c, k = c0, 0
+        while abs(np.mean(np.sign(y - c))) > 1e-12 and k < 1000:
+            c, k = c + 0.5 * np.mean(np.sign(y - c)), k + 1
+        print(f"9) старт {c0}: остановка на шаге {k} в c = {c:.4f}")
+    print("   Минимум MAE для чётного n — весь отрезок [5, 8]: спуск останавливается в первой его точке, куда попал.")
+
+
+def task_10() -> None:
+    def steps(kappa: float, eta: float, beta: float = 0.0) -> int:
+        t0 = np.array([2.5, 1.0])
+        t, v = t0.copy(), np.zeros(2)
+        for k in range(1, 100001):
+            v = beta * v - eta * np.array([t[0], kappa * t[1]])
+            t = t + v
+            if np.linalg.norm(t) < 1e-3 * np.linalg.norm(t0):
+                return k
+        return -1
+
+    for kappa in (1, 10, 100):
+        sq = np.sqrt(kappa)
+        plain = steps(kappa, 2 / (1 + kappa))
+        heavy = steps(kappa, (2 / (1 + sq)) ** 2, ((sq - 1) / (sq + 1)) ** 2)
+        print(f"10) κ = {kappa:3d}: постоянный темп — {plain} шагов, с инерцией — {heavy}")
+    print("    Без инерции шагов ~κ, с инерцией ~√κ.")
+
+
+def task_11() -> None:
+    x = np.array([30, 40, 50, 60, 70, 80.0])
+    r = np.array([3, 5, 4, 8, 9, 13.0]) - 7
+    for t in (x[:-1] + x[1:]) / 2:
+        h = np.where(x <= t, r[x <= t].mean(), r[x > t].mean())
+        sse = np.sum((r - 0.5 * h) ** 2)
+        print(f"11) порог {t:.0f}: h·r = {h @ r:5.1f}, ‖h‖² = {h @ h:5.1f}, сумма квадратов {sse:6.2f} = 70 − 0.75·h·r = {70 - 0.75 * (h @ r):6.2f}")
+    print("    ‖h‖² = h·r: в каждой группе h — среднее r, поэтому Σ h·(r − h) = 0. Тогда Σ(r − νh)² = ‖r‖² − (2ν − ν²)·h·r.")
+
+
+def task_12() -> None:
+    X, y = datasets.regression_1d(kind="linear", n=30, noise=0.6, seed=3)
+    z = (X[:, 0] - X[:, 0].mean()) / X[:, 0].std()
+    half = lambda a, b: np.mean((y - a * z - b) ** 2) / 2  # noqa: E731
+    opt = half(np.mean(z * (y - y.mean())), y.mean())
+    for eta in (0.1, 0.03):
+        for B in (1, 5, 30):
+            rng, a, b, excess = Mulberry32(1), 0.0, 0.0, []
+            for k in range(200):
+                idx = rng.sample(30, B) if B < 30 else list(range(30))
+                res = y[idx] - (a * z[idx] + b)
+                a, b = a + eta * np.mean(res * z[idx]), b + eta * np.mean(res)
+                if k >= 100:
+                    excess.append(half(a, b) - opt)
+            print(f"12) η = {eta}, B = {B:2d}: средний избыток ½·MSE над минимумом {np.mean(excess):.5f}")
+    print("    Шум растёт с η и убывает с B. Меньший η уменьшает шум (B = 1: 0.018 → 0.008), но замедляет схождение:")
+    print("    при η = 0.03 даже полный спуск за 200 шагов ещё не дошёл до минимума. Поэтому темп уменьшают к концу обучения.")
+
+
 if __name__ == "__main__":
     task_1()
     task_2()
@@ -99,3 +168,8 @@ if __name__ == "__main__":
     task_5()
     task_6()
     task_7()
+    task_8()
+    task_9()
+    task_10()
+    task_11()
+    task_12()
