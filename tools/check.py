@@ -24,7 +24,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LESSONS = ROOT / "lessons"
-REQUIRED_DIRS = ["web", "jupyter_notebooks", "examples", "data", "exercises", "assets"]
+# data/ не входит в список: её создаёт tools/build.py из lesson.json → datasets, а у уроков без наборов
+# данных пустая папка в git не хранится. Наличие объявленных CSV проверяется отдельно.
+REQUIRED_DIRS = ["web", "jupyter_notebooks", "examples", "exercises", "assets"]
 REQUIRED_KEYS = ["id", "title", "subtitle", "summary", "level", "duration", "objectives"]
 
 problems: list[str] = []
@@ -108,6 +110,9 @@ def main() -> int:
         for sub in REQUIRED_DIRS:
             if not (d / sub).is_dir():
                 err(f"{rel}: нет папки {sub}/")
+        for ds in meta.get("datasets", []):
+            if not (d / ds["file"]).is_file():
+                err(f"{rel}: нет {ds['file']} из lesson.json → datasets (запустите tools/build.py data)")
         page = d / "web" / "index.html"
         if not page.exists():
             err(f"{rel}: нет web/index.html")
