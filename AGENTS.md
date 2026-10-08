@@ -152,6 +152,10 @@ lessons/lesson_4_1/
 | `<a data-lesson="lesson_2_1"></a>` | ссылка на урок (текст подставится) |
 | `<div data-sublessons></div>` | список уроков модуля |
 | `.key-points`, `.compare`, `.grid-2`, `.table-wrap`, `.badge`, `.figure` | вспомогательная вёрстка |
+| `<section class="lesson-part" id="part-2"><h2 class="part-head"><span class="part-num">Часть II.</span> Название</h2><p>…</p></section>` | баннер части длинного урока (выделен и в оглавлении); после части — выноска `callout note` «Привал» с итогами |
+| `<details class="deeper"><summary>…</summary><div class="deeper-body">…</div></details>` | необязательный углублённый блок с меткой «Глубже» — можно пропустить при первом чтении |
+| `<div class="quiz" data-quiz-id="lesson_1_3:part2">…</div>` | мини-тест внутри урока со своим счётом (без `data-quiz-id` результат пишется в общий тест урока) |
+| `<pre class="algo">…<span class="hl">…</span> <span class="cm"># …</span></pre>` | псевдокод алгоритма; `.hl` — отличающаяся строка, `.cm` — комментарий |
 
 ---
 

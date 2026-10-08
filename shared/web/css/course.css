@@ -2580,6 +2580,97 @@ input.input {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* Части длинного урока: баннер «Часть II · …»; его h2.part-head попадает в оглавление */
+.lesson-part {
+  margin: 76px 0 10px;
+  padding: 18px 22px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  background: var(--accent-soft);
+}
+.lesson .lesson-part h2.part-head {
+  margin: 0 0 6px;
+  padding-top: 0;
+  font-size: 1.4rem;
+}
+.lesson-part .part-num {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.lesson-part p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 1rem;
+}
+.toc li.part a {
+  margin-top: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+/* «Глубже»: необязательный разбор, который можно пропустить при первом чтении */
+details.deeper {
+  margin: 18px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+details.deeper > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  font-size: 0.97rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+details.deeper > summary::-webkit-details-marker {
+  display: none;
+}
+details.deeper > summary::before {
+  content: 'Глубже';
+  flex: none;
+  padding: 0 8px;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+details.deeper[open] > summary {
+  border-bottom: 1px dashed var(--border-strong);
+}
+details.deeper > .deeper-body {
+  padding: 12px 16px 2px;
+  font-size: 0.98rem;
+}
+/* Псевдокод алгоритма: строки, отличающие один алгоритм от другого, — .hl */
+pre.algo {
+  line-height: 1.7;
+}
+pre.algo .hl {
+  border-radius: 4px;
+  padding: 1px 3px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+pre.algo .cm {
+  color: var(--muted);
+}
 .key-points {
   margin: 18px 0;
   padding: 18px 20px 8px;

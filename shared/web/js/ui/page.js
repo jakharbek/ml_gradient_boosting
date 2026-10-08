@@ -240,7 +240,7 @@
       if (!h.id) h.id = 'sec-' + (i + 1);
       const a = H('a', { href: '#' + h.id }, h.textContent.replace(/#$/, '').trim());
       links.set(h.id, a);
-      ol.appendChild(H('li', { class: h.tagName === 'H3' ? 'h3' : 'h2' }, a));
+      ol.appendChild(H('li', { class: h.tagName === 'H3' ? 'h3' : h.classList.contains('part-head') ? 'h2 part' : 'h2' }, a));
       const anchor = H('a', { class: 'anchor', href: '#' + h.id, 'aria-label': 'Ссылка на раздел' }, '#');
       h.appendChild(anchor);
     });
