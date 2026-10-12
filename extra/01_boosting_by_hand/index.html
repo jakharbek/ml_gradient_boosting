@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Градиентный бустинг с нуля</title>
+<meta name="description" content="Интерактивный одностраничный урок: как работает градиентный бустинг на примере четырёх ноутбуков.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f4ee; --paper:#ffffff; --ink:#1b1f2a; --muted:#5f6675; --line:#e3dfd4;
+  --navy:#1f3864; --teal:#2e75b6; --teal-soft:#e4eef9;
+  --green:#1b7f4b; --green-soft:#e3f3e8; --amber:#b7791f; --amber-soft:#fdf2d8;
+  --red:#c0392b; --red-soft:#fbe5e2;
+  --radius:14px; --shadow:0 10px 30px rgba(27,31,42,.07);
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#13161d; --paper:#1b1f2a; --ink:#eef0f4; --muted:#9aa3b2; --line:#2b3140;
+  --teal-soft:#1d2e45; --green-soft:#17301f; --green:#5ac98a; --amber-soft:#3a2d12; --amber:#e3b25a;
+  --red-soft:#3a1c19; --red:#ef7a6d; --navy:#9bb6e8; --shadow:0 10px 30px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{
+  --bg:#13161d; --paper:#1b1f2a; --ink:#eef0f4; --muted:#9aa3b2; --line:#2b3140;
+  --teal-soft:#1d2e45; --green-soft:#17301f; --green:#5ac98a; --amber-soft:#3a2d12; --amber:#e3b25a;
+  --red-soft:#3a1c19; --red:#ef7a6d; --navy:#9bb6e8; --shadow:0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Manrope,system-ui,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px 80px}
+header.hero{padding:64px 0 36px}
+.eyebrow{display:inline-block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);font-weight:800;margin-bottom:14px}
+h1{font-size:clamp(30px,5vw,48px);line-height:1.08;margin:0 0 16px;font-weight:800;letter-spacing:-.02em}
+.lead{font-size:18px;color:var(--muted);max-width:640px;margin:0}
+.hero .idea{margin-top:28px;padding:18px 22px;border-left:4px solid var(--teal);background:var(--paper);border-radius:0 var(--radius) var(--radius) 0;box-shadow:var(--shadow);font-weight:700}
+nav.steps{display:flex;gap:8px;flex-wrap:wrap;margin:28px 0 8px}
+nav.steps a{font-size:13px;font-weight:700;color:var(--muted);text-decoration:none;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--paper)}
+nav.steps a:hover{color:var(--teal);border-color:var(--teal)}
+section.step{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px 26px;margin:28px 0}
+.step-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:8px}
+.badge{flex:0 0 46px;height:46px;border-radius:12px;background:var(--navy);color:#fff;display:grid;place-items:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:18px}
+.step h2{margin:4px 0 6px;font-size:24px;letter-spacing:-.01em}
+.step .sub{color:var(--muted);margin:0;max-width:680px}
+.callout{margin:18px 0;padding:14px 18px;border-radius:10px;background:var(--teal-soft);border-left:4px solid var(--teal)}
+.callout.green{background:var(--green-soft);border-color:var(--green)}
+.callout.amber{background:var(--amber-soft);border-color:var(--amber)}
+.formula{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;padding:12px 16px;border-radius:10px;background:var(--bg);border:1px dashed var(--line);margin:14px 0;overflow-x:auto}
+.formula .v{color:var(--green)}
+table{width:100%;border-collapse:separate;border-spacing:0;margin:16px 0;font-size:15px;overflow:hidden;border-radius:10px;border:1px solid var(--line)}
+th{background:var(--teal);color:#fff;text-align:left;padding:10px 12px;font-weight:700;font-size:13px;letter-spacing:.03em}
+td{padding:10px 12px;border-top:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:14px}
+td:first-child,th:first-child{font-family:Manrope,sans-serif;font-weight:800}
+td.res{background:var(--green-soft);color:var(--green);font-weight:700}
+td.neg{color:var(--red)}
+td.pos{color:var(--green)}
+td.zero{color:var(--muted)}
+.tbl-wrap{overflow-x:auto}
+input.price{width:84px;font:inherit;font-family:'JetBrains Mono',monospace;font-weight:700;padding:6px 8px;border:2px solid var(--amber);background:var(--amber-soft);color:var(--ink);border-radius:8px;text-align:right}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--bg)}
+.card h4{margin:0 0 6px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.card .big{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--green)}
+.card .calc{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--muted);margin-top:4px}
+.bars{display:flex;gap:18px;align-items:flex-end;height:180px;padding:16px 8px 0;border-bottom:2px solid var(--line);margin-top:14px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.bar .fill{width:100%;max-width:120px;background:linear-gradient(180deg,var(--teal),var(--navy));border-radius:8px 8px 0 0;transition:height .5s ease;min-height:3px}
+.bar .val{font-family:'JetBrains Mono',monospace;font-weight:700;margin-bottom:6px}
+.bar .lbl{font-size:13px;color:var(--muted);margin-top:8px;text-align:center}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:800;background:var(--amber-soft);color:var(--amber);margin-left:8px;vertical-align:middle}
+details{margin:14px 0;border:1px solid var(--line);border-radius:10px;padding:0 16px;background:var(--bg)}
+summary{cursor:pointer;font-weight:800;padding:12px 0;color:var(--navy)}
+details p{margin:0 0 14px;color:var(--muted)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+button{font:inherit;font-weight:800;padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer}
+button.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+button:hover{filter:brightness(1.05)}
+footer{color:var(--muted);font-size:13px;margin-top:40px;text-align:center}
+.status{font-size:14px;color:var(--muted)}
+.status b{color:var(--green)}
+.status b.warn{color:var(--amber)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <a class="eyebrow" href="../../index.html" style="text-decoration:none">← Бустинг по косточкам · дополнительный урок</a>
+  <h1>Градиентный бустинг<br>с нуля, на четырёх ноутбуках</h1>
+  <p class="lead">Никаких библиотек и формул из учебника — только сложение, вычитание и среднее. Все числа на странице живые: поменяйте цену, и каждый шаг пересчитается.</p>
+  <div class="idea">Бустинг не строит одну умную модель. Он складывает цепочку простых, где каждая следующая исправляет ошибки суммы предыдущих.</div>
+  <nav class="steps">
+    <a href="#data">Данные</a><a href="#s0">Шаг 0 · старт</a><a href="#s1">Шаг 1 · экран</a><a href="#s2">Шаг 2 · SSD</a><a href="#s3">Шаг 3 · формула</a><a href="#sum">Итог</a>
+  </nav>
+</header>
+
+<!-- DATA -->
+<section class="step" id="data">
+  <div class="step-head"><div class="badge">⌂</div><div><h2>Исходные данные</h2><p class="sub">Четыре ноутбука, два признака и реальная цена. Жёлтые поля можно редактировать.</p></div></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Ноутбук</th><th>Экран</th><th>SSD</th><th>Реальная цена</th></tr></thead>
+    <tbody>
+      <tr><td>A</td><td>13"</td><td>256 ГБ</td><td><input class="price" data-i="0" type="number" value="820"></td></tr>
+      <tr><td>B</td><td>13"</td><td>512 ГБ</td><td><input class="price" data-i="1" type="number" value="880"></td></tr>
+      <tr><td>C</td><td>15"</td><td>256 ГБ</td><td><input class="price" data-i="2" type="number" value="1120"></td></tr>
+      <tr><td>D</td><td>15"</td><td>512 ГБ</td><td><input class="price" data-i="3" type="number" value="1180"></td></tr>
+    </tbody>
+  </table></div>
+  <div class="toolbar">
+    <button class="primary" id="reset">Вернуть исходные цены</button>
+    <button id="perturb">Сделать D = 1200 и посмотреть, что сломается</button>
+    <span class="status" id="status"></span>
+  </div>
+</section>
+
+<!-- STEP 0 -->
+<section class="step" id="s0">
+  <div class="step-head"><div class="badge">0</div><div><h2>Стартовое предсказание</h2><p class="sub">Модели ещё нет. Самое простое, что можно сделать — предсказать всем одно число: среднее всех цен.</p></div></div>
+  <div class="formula">Среднее = (<span id="f0sum"></span>) / 4 = <span class="v" id="f0mean"></span></div>
+  <div class="callout"><b>Остаток</b> (residual) — это то, насколько мы промахнулись: <i>реальная − предсказание</i>. Минус значит «завысили», плюс — «занизили». Именно остатки будет учить следующая модель.</div>
+  <div class="tbl-wrap"><table id="t0">
+    <thead><tr><th>Ноутбук</th><th>Реальная</th><th>Предсказание</th><th>Остаток</th><th>|Остаток|</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="card"><h4>Сумма модулей ошибок</h4><div class="big" id="sum0"></div><div class="calc" id="sum0calc"></div></div>
+  <details><summary>Что такое модуль и зачем он здесь?</summary><p>Модуль — число без знака: |−40| = 40, |+40| = 40. Остатки бывают с плюсом и минусом, и если их просто сложить, они взаимно погасятся — покажется, что ошибок нет. Поэтому перед сложением у каждого убираем знак. Сумма модулей — наш индикатор: с каждым шагом она должна падать.</p></details>
+</section>
+
+<!-- STEP 1 -->
+<section class="step" id="s1">
+  <div class="step-head"><div class="badge">1</div><div><h2>Первая модель: деление по экрану</h2><p class="sub">Маленькая модель делит ноутбуки на две группы по одному признаку и даёт каждой группе одну поправку — среднее остатков в группе.</p></div></div>
+  <div class="grid2">
+    <div class="card"><h4>Группа 13" = {A, B}</h4><div class="big" id="p13"></div><div class="calc" id="p13calc"></div></div>
+    <div class="card"><h4>Группа 15" = {C, D}</h4><div class="big" id="p15"></div><div class="calc" id="p15calc"></div></div>
+  </div>
+  <div class="formula">Новое предсказание = старое + поправка группы &nbsp;·&nbsp; Новый остаток = реальная − новое</div>
+  <div class="tbl-wrap"><table id="t1">
+    <thead><tr><th>Ноутбук</th><th>Старое</th><th>Поправка</th><th>Новое</th><th>Реальная</th><th>Новый остаток</th><th>|Остаток|</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="card"><h4>Сумма модулей ошибок</h4><div class="big" id="sum1"></div><div class="calc" id="sum1calc"></div></div>
+  <div class="callout amber" id="note1"></div>
+</section>
+
+<!-- STEP 2 -->
+<section class="step" id="s2">
+  <div class="step-head"><div class="badge">2</div><div><h2>Вторая модель: деление по SSD</h2><p class="sub">Остатки после шага 1 — это то, чего экран не объяснил. Теперь делим по SSD и повторяем ту же процедуру.</p></div></div>
+  <div class="grid2">
+    <div class="card"><h4>Группа 256 ГБ = {A, C}</h4><div class="big" id="p256"></div><div class="calc" id="p256calc"></div></div>
+    <div class="card"><h4>Группа 512 ГБ = {B, D}</h4><div class="big" id="p512"></div><div class="calc" id="p512calc"></div></div>
+  </div>
+  <div class="tbl-wrap"><table id="t2">
+    <thead><tr><th>Ноутбук</th><th>Старое</th><th>Поправка</th><th>Новое</th><th>Реальная</th><th>Новый остаток</th><th>|Остаток|</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="card"><h4>Сумма модулей ошибок</h4><div class="big" id="sum2"></div><div class="calc" id="sum2calc"></div></div>
+  <div class="callout green" id="note2"></div>
+</section>
+
+<!-- STEP 3 -->
+<section class="step" id="s3">
+  <div class="step-head"><div class="badge">3</div><div><h2>Финальная формула</h2><p class="sub">Готовая модель — это сумма. Ни одна из моделек не знала всей цены: каждая выучила только свой кусок.</p></div></div>
+  <div class="formula">Итог = <span class="v">старт</span> + <span class="v">поправка по экрану</span> + <span class="v">поправка по SSD</span></div>
+  <div class="tbl-wrap"><table id="t3">
+    <thead><tr><th>Ноутбук</th><th>Старт</th><th>Экран</th><th>SSD</th><th>Итог</th><th>Реальная</th><th>Ошибка</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="callout" id="note3"></div>
+</section>
+
+<!-- SUMMARY -->
+<section class="step" id="sum">
+  <div class="step-head"><div class="badge">Σ</div><div><h2>Как уменьшалась ошибка</h2><p class="sub">Три числа, которые нужно запомнить с этой страницы.</p></div></div>
+  <div class="bars" id="bars"></div>
+  <details><summary>Почему в реальности остатки не обнуляются?</summary><p>Здесь цены специально подобраны как «база + вклад экрана + вклад SSD», поэтому двух шагов хватило. Настоящие данные так не устроены: в них есть шум и признаки, которых у нас нет. Поэтому реальный бустинг делает сотни шагов, и ошибка падает, но до нуля не доходит. Нажмите кнопку «Сделать D = 1200» вверху — и увидите это на своих числах.</p></details>
+  <details><summary>Что дальше: learning rate</summary><p>В настоящем бустинге поправку прибавляют не целиком, а только её часть — например 10 %. Это называется темп обучения (learning rate). Шагов становится больше, зато модель не «перепрыгивает» и лучше работает на новых данных. Это тема следующего урока.</p></details>
+</section>
+
+<footer>Дополнительный урок курса «Градиентный бустинг по косточкам». Продолжение темы — <a href="../../lessons/lesson_4_1/web/index.html">урок 4.1 «Бустинг на остатках вручную»</a>. Все вычисления выполняются в браузере.</footer>
+</div>
+
+<script>
+(function(){
+  var DEF=[820,880,1120,1180], names=["A","B","C","D"];
+  var inputs=[].slice.call(document.querySelectorAll("input.price"));
+  var fmt=function(x){ var r=Math.round(x*100)/100; return (r>0?"+":"")+r; };
+  var fmtp=function(x){ return Math.round(x*100)/100; };
+  var cls=function(x){ return x>0?"pos":x<0?"neg":"zero"; };
+  var td=function(v,c){ return "<td class='"+(c||"")+"'>"+v+"</td>"; };
+  var avg=function(a){ return a.reduce(function(s,x){return s+x;},0)/a.length; };
+  var sumAbs=function(a){ return a.reduce(function(s,x){return s+Math.abs(x);},0); };
+
+  function render(){
+    var y=inputs.map(function(i){ return Number(i.value)||0; });
+    var mean=avg(y);
+    var r0=y.map(function(v){ return v-mean; });
+    document.getElementById("f0sum").textContent=y.join(" + ");
+    document.getElementById("f0mean").textContent=fmtp(mean);
+    document.querySelector("#t0 tbody").innerHTML=y.map(function(v,i){
+      return "<tr>"+td(names[i])+td(v)+td(fmtp(mean))+td(fmt(r0[i]),"res "+cls(r0[i]))+td(fmtp(Math.abs(r0[i])))+"</tr>";
+    }).join("");
+    var s0=sumAbs(r0);
+    document.getElementById("sum0").textContent=fmtp(s0);
+    document.getElementById("sum0calc").textContent=r0.map(function(v){return fmtp(Math.abs(v));}).join(" + ")+" = "+fmtp(s0);
+
+    // step 1: screen groups {0,1},{2,3}
+    var p13=avg([r0[0],r0[1]]), p15=avg([r0[2],r0[3]]);
+    document.getElementById("p13").textContent=fmt(p13);
+    document.getElementById("p13calc").textContent="("+fmt(r0[0])+" "+fmt(r0[1])+") / 2";
+    document.getElementById("p15").textContent=fmt(p15);
+    document.getElementById("p15calc").textContent="("+fmt(r0[2])+" "+fmt(r0[3])+") / 2";
+    var pred1=[], r1=[];
+    for(var i=0;i<4;i++){ var p=i<2?p13:p15; pred1[i]=mean+p; r1[i]=y[i]-pred1[i]; }
+    document.querySelector("#t1 tbody").innerHTML=y.map(function(v,i){
+      var p=i<2?p13:p15;
+      return "<tr>"+td(names[i])+td(fmtp(mean))+td(fmt(p),cls(p))+td(fmtp(pred1[i]),"res")+td(v)+td(fmt(r1[i]),"res "+cls(r1[i]))+td(fmtp(Math.abs(r1[i])))+"</tr>";
+    }).join("");
+    var s1=sumAbs(r1);
+    document.getElementById("sum1").textContent=fmtp(s1);
+    document.getElementById("sum1calc").textContent=r1.map(function(v){return fmtp(Math.abs(v));}).join(" + ")+" = "+fmtp(s1)+"  (было "+fmtp(s0)+")";
+    document.getElementById("note1").innerHTML="Экран объяснил главное: ошибка упала с <b>"+fmtp(s0)+"</b> до <b>"+fmtp(s1)+"</b>. Но внутри каждой группы остался узор остатков — это то, что экран «не видит». Его доедает следующая модель.";
+
+    // step 2: ssd groups {0,2},{1,3}
+    var p256=avg([r1[0],r1[2]]), p512=avg([r1[1],r1[3]]);
+    document.getElementById("p256").textContent=fmt(p256);
+    document.getElementById("p256calc").textContent="("+fmt(r1[0])+" "+fmt(r1[2])+") / 2";
+    document.getElementById("p512").textContent=fmt(p512);
+    document.getElementById("p512calc").textContent="("+fmt(r1[1])+" "+fmt(r1[3])+") / 2";
+    var pred2=[], r2=[];
+    for(var j=0;j<4;j++){ var q=j%2===0?p256:p512; pred2[j]=pred1[j]+q; r2[j]=y[j]-pred2[j]; }
+    document.querySelector("#t2 tbody").innerHTML=y.map(function(v,i){
+      var q=i%2===0?p256:p512;
+      return "<tr>"+td(names[i])+td(fmtp(pred1[i]))+td(fmt(q),cls(q))+td(fmtp(pred2[i]),"res")+td(v)+td(fmt(r2[i]),"res "+cls(r2[i]))+td(fmtp(Math.abs(r2[i])))+"</tr>";
+    }).join("");
+    var s2=sumAbs(r2);
+    document.getElementById("sum2").textContent=fmtp(s2);
+    document.getElementById("sum2calc").textContent=r2.map(function(v){return fmtp(Math.abs(v));}).join(" + ")+" = "+fmtp(s2)+"  (было "+fmtp(s1)+")";
+    var exact=Math.abs(s2)<1e-9;
+    document.getElementById("note2").innerHTML=exact
+      ? "Все остатки нули — обучение закончено. Два признака полностью объяснили цену."
+      : "Остатки не обнулились: сумма модулей <b>"+fmtp(s2)+"</b>. Так и выглядит реальная жизнь — часть цены не объясняется ни экраном, ни SSD. Настоящий бустинг продолжил бы делать шаги дальше.";
+    document.getElementById("note2").className="callout "+(exact?"green":"amber");
+
+    // step 3
+    document.querySelector("#t3 tbody").innerHTML=y.map(function(v,i){
+      var a=i<2?p13:p15, b=i%2===0?p256:p512, tot=mean+a+b, e=v-tot;
+      return "<tr>"+td(names[i])+td(fmtp(mean))+td(fmt(a),cls(a))+td(fmt(b),cls(b))+td(fmtp(tot),"res")+td(v)+td(fmt(e),cls(e))+"</tr>";
+    }).join("");
+    document.getElementById("note3").innerHTML="Для ноутбука A: "+fmtp(mean)+" "+fmt(p13)+" "+fmt(p256)+" = <b>"+fmtp(mean+p13+p256)+"</b>. Модель 1 узнала «большой экран дороже на "+fmtp(p15-p13)+"», модель 2 — «больший SSD добавляет "+fmtp(p512-p256)+"». Сумма дала ответ.";
+
+    // bars
+    var vals=[s0,s1,s2], labels=["Шаг 0<br>среднее","Шаг 1<br>+ экран","Шаг 2<br>+ SSD"], mx=Math.max.apply(null,vals)||1;
+    document.getElementById("bars").innerHTML=vals.map(function(v,i){
+      return "<div class='bar'><div class='val'>"+fmtp(v)+"</div><div class='fill' style='height:"+(v/mx*100)+"%'></div><div class='lbl'>"+labels[i]+"</div></div>";
+    }).join("");
+
+    var st=document.getElementById("status");
+    var isDef=y.every(function(v,i){return v===DEF[i];});
+    st.innerHTML=isDef?"Исходный пример: ошибка <b>"+fmtp(s0)+" → "+fmtp(s1)+" → "+fmtp(s2)+"</b>":"Ваши числа: ошибка <b class='"+(exact?"":"warn")+"'>"+fmtp(s0)+" → "+fmtp(s1)+" → "+fmtp(s2)+"</b>";
+  }
+  inputs.forEach(function(i){ i.addEventListener("input",render); });
+  document.getElementById("reset").addEventListener("click",function(){ inputs.forEach(function(i,k){ i.value=DEF[k]; }); render(); });
+  document.getElementById("perturb").addEventListener("click",function(){ inputs.forEach(function(i,k){ i.value=DEF[k]; }); inputs[3].value=1200; render(); document.getElementById("s2").scrollIntoView({behavior:"smooth"}); });
+  render();
+})();
+</script>
+</body>
+</html>
