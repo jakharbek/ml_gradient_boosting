@@ -21,6 +21,13 @@ cd claude-server
 node server.js
 ```
 
+**Без клонирования репозитория.** С сайта курса можно скачать архив
+`claude-server.zip` (кнопка в панели ИИ-ассистента или `https://jakharbek.github.io/ml_gradient_boosting/claude-server.zip`),
+распаковать и запустить `start.cmd` (Windows) или `./start.sh` (macOS/Linux). Эти скрипты
+добавляют адрес сайта курса в `CLAUDE_SERVER_ALLOWED_ORIGINS`, чтобы страницы на GitHub Pages
+могли обращаться к серверу на вашем компьютере; просто `node server.js` разрешает только
+localhost и `file://`.
+
 По умолчанию слушает `http://127.0.0.1:8137` (только localhost).
 
 ### Переменные окружения

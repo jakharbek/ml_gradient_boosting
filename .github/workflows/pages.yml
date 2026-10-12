@@ -1,6 +1,7 @@
 # Публикация курса на GitHub Pages при каждом изменении main.
 # Сайт статический: все сгенерированные файлы (manifest.js, pybundle.js, ноутбуки)
-# уже лежат в репозитории, поэтому сборка не нужна — публикуется сам репозиторий.
+# уже лежат в репозитории, поэтому сборка не нужна — публикуется сам репозиторий
+# (плюс claude-server.zip, который собирается здесь для скачивания из панели ИИ-ассистента).
 # Однократная настройка: Settings → Pages → Build and deployment → Source: GitHub Actions.
 name: Pages
 
@@ -26,6 +27,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Собрать claude-server.zip для скачивания с сайта
+        run: |
+          cd claude-server
+          zip -r ../claude-server.zip . -x "node_modules/*"
+          cd ..
+          ls -la claude-server.zip
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

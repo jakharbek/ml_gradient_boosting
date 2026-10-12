@@ -225,6 +225,15 @@
   background: var(--surface);
   border: 1px solid var(--border);
 }
+.assistant-offline .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.assistant-offline .actions .btn {
+  text-decoration: none;
+}
 .assistant-offline .cmd code {
   flex: 1;
   min-width: 0;

@@ -19,6 +19,8 @@ python tools/serve.py          # откроет http://127.0.0.1:8000/index.html
 выделенного текста. Ассистент работает через локальный `claude-server` (Claude Code на вашем компьютере, вход
 `claude login`, ключ API не нужен). `python tools/serve.py` запускает его автоматически; вручную —
 `node claude-server/server.js`. Нужен Node.js 18+. Без сервера курс работает как обычно.
+Читаете курс на GitHub Pages? Сервер можно скачать архивом — кнопка «Скачать claude-server (zip)» в панели ассистента
+или [claude-server.zip](https://jakharbek.github.io/ml_gradient_boosting/claude-server.zip): распаковать и запустить `start.cmd` / `./start.sh`.
 К вопросу можно приложить снимок экрана: кнопка-камера в поле ввода → разрешить показ вкладки → выделить
 мышью область (график, виджет, вывод кода). Картинку можно и вставить из буфера обмена (Ctrl+V).
 

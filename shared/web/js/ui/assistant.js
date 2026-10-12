@@ -906,6 +906,11 @@
     retry.addEventListener('click', async () => {
       if (await checkServer()) GBC.ui.toast('Сервер на связи');
     });
+    // Страница открыта не с localhost/диска (например, GitHub Pages): серверу нужно
+    // разрешить этот адрес — это делают start.cmd / start.sh из архива.
+    const remotePage = /^https?:$/.test(root.location.protocol) && !/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(root.location.hostname);
+    const zipHref = ((root.GBC_BOOT && root.GBC_BOOT.root) || './') + 'claude-server.zip';
+    const download = H('a', { class: 'btn small', href: zipHref, download: 'claude-server.zip' }, icon('download'), 'Скачать claude-server (zip)');
     el.offline = H(
       'div',
       { class: 'assistant-offline', hidden: true, role: 'status' },
@@ -913,7 +918,19 @@
       H('p', null, 'Ассистент работает через Claude Code на вашем компьютере. Запустите сервер в терминале из корня курса:'),
       H('div', { class: 'cmd' }, cmd, copyCmd),
       H('p', { class: 'muted' }, 'Нужны Node.js 18+ и выполненный вход ', H('code', null, 'claude login'), '. Команда ', H('code', null, 'python tools/serve.py'), ' запускает сервер вместе с курсом.'),
-      retry
+      H(
+        'p',
+        { class: 'muted' },
+        'Нет репозитория под рукой? Скачайте архив, распакуйте и запустите ',
+        H('code', null, 'start.cmd'),
+        ' (Windows) или ',
+        H('code', null, './start.sh'),
+        ' (macOS/Linux)',
+        remotePage ? ' — эти скрипты разрешают серверу запросы с адреса ' : '.',
+        remotePage ? H('code', null, root.location.origin) : null,
+        remotePage ? '.' : null
+      ),
+      H('div', { class: 'actions' }, download, retry)
     );
 
     el.empty = H(

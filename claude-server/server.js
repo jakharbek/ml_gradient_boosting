@@ -718,6 +718,12 @@ function applyCors(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Max-Age", "86400");
+  // Private Network Access: a page served from the public web (e.g. GitHub Pages)
+  // calling a loopback server - Chrome sends this preflight header and expects
+  // the mirror. Harmless for local pages.
+  if (req.headers["access-control-request-private-network"] === "true") {
+    res.setHeader("Access-Control-Allow-Private-Network", "true");
+  }
 }
 
 const server = http.createServer(async (req, res) => {
