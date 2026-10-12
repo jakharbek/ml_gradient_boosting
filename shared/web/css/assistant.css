@@ -756,6 +756,19 @@ body.assistant-shooting .toast {
 }
 
 /* ---------- Служебное, что нужно панели и вне course.css (самостоятельные страницы extra/) ---------- */
+/* База course.css «button, input, textarea { font: inherit; color: inherit }» — без неё поле ввода
+   берёт системный чёрный цвет и в тёмной теме текст вопроса не виден. */
+.assistant button,
+.assistant input,
+.assistant select,
+.assistant textarea,
+.assistant-ask {
+  font: inherit;
+  color: inherit;
+}
+.assistant select {
+  background: var(--surface);
+}
 .toast {
   position: fixed;
   left: 50%;
