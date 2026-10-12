@@ -184,8 +184,8 @@ footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
 .assistant-toggle[aria-pressed="true"]{border-color:var(--teal);color:var(--teal);background:var(--teal-soft)}
 @media (min-width:1281px){
   body.assistant-open{padding-right:var(--assistant-w)}
-  body.assistant-open .layout{grid-template-columns:230px minmax(0,1fr);margin:0 auto}
-  body.assistant-open .toc{display:block}
+  body.assistant-open .layout:not(.home){grid-template-columns:230px minmax(0,1fr);margin:0 auto;max-width:1180px}
+  body.assistant-open aside.toc{display:block}
   body.assistant-open .topwrap{margin-right:calc(-1 * var(--assistant-w));padding-right:var(--assistant-w)}
 }
 body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
