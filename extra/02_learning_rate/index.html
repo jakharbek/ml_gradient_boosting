@@ -89,6 +89,8 @@ main .formula.left{text-align:left}
 main .tbl{overflow-x:auto;margin:12px 0}
 main table{width:100%;border-collapse:separate;border-spacing:0;font-size:14.5px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 main th{background:var(--teal-soft);color:var(--ink);text-align:left;padding:9px 12px;font-weight:800;font-size:12.5px;letter-spacing:.02em;border-bottom:1px solid var(--line)}
+main th .katex{font-size:1.15em;font-weight:400}
+.stat h4 .katex{font-size:1.25em;text-transform:none;letter-spacing:0}
 main td{padding:8px 12px;border-top:1px solid var(--line-2);font-family:'JetBrains Mono',monospace;font-size:13.5px;vertical-align:middle}
 main tr:first-child td{border-top:0}
 main td.k,th.k{font-family:Manrope,sans-serif;font-weight:800}
@@ -239,7 +241,7 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
 <section class="card" id="data">
   <div class="sec-head"><div class="badge">⌂</div><div><h2>Данные и параметры</h2><p class="sub">Те же четыре ноутбука. Жёлтые поля и ν можно менять — пересчитается всё: сводка, графики и все 20 шагов с пояснениями.</p></div></div>
   <div class="tbl"><table>
-    <thead><tr><th class="k">Ноутбук</th><th>Экран</th><th>SSD</th><th>Реальная цена yᵢ</th></tr></thead>
+    <thead><tr><th class="k">Ноутбук</th><th>Экран</th><th>SSD</th><th>Реальная цена $y_i$</th></tr></thead>
     <tbody>
       <tr><td class="k">A</td><td>13"</td><td>256 ГБ</td><td><input class="num price" data-i="0" type="number" value="820"></td></tr>
       <tr><td class="k">B</td><td>13"</td><td>512 ГБ</td><td><input class="num price" data-i="1" type="number" value="880"></td></tr>
@@ -297,7 +299,7 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
   </div>
   <div class="legend"><span><i style="background:var(--teal)"></i>выбран экран</span><span><i style="background:var(--orange)"></i>выбран SSD</span></div>
   <svg class="chart" id="chPick"></svg>
-  <div class="tbl"><table id="tSummary"><thead><tr><th class="k">Шаг</th><th>Выбрана колонка</th><th>Σ|rᵢ|</th><th>Σrᵢ²</th><th>γ экран {13"; 15"}</th><th>γ SSD {256; 512}</th></tr></thead><tbody></tbody></table></div>
+  <div class="tbl"><table id="tSummary"><thead><tr><th class="k">Шаг</th><th>Выбрана колонка</th><th>$\sum|r_i|$</th><th>$\sum r_i^2$</th><th>$\gamma$ экран $\{13\text{″};\,15\text{″}\}$</th><th>$\gamma$ SSD $\{256;\,512\}$</th></tr></thead><tbody></tbody></table></div>
 </section>
 
 <!-- STEPS -->
@@ -480,14 +482,14 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
     var sa0=sumAbs(r), ss0=sumSq(r), sa1=sumAbs(rn), ss1=sumSq(rn);
     var hmax=Math.max.apply(null,h.map(Math.abs)), left=(1-lr)*hmax;
     var ratio=c[best].sse>0? c[other].sse/c[best].sse : Infinity;
-    var html="<details class='step' id='step-"+m+"'"+(open?" open":"")+"><summary><div class='step-no'>"+m+"</div><div class='step-title'>$F_{"+m+"} = F_{"+(m-1)+"} + \\nu\\,h_{"+m+"}$<small>Σ|rᵢ|: "+f2(sa0)+" → "+f2(sa1)+"</small></div>"+
+    var html="<details class='step' id='step-"+m+"'"+(open?" open":"")+"><summary><div class='step-no'>"+m+"</div><div class='step-title'>$F_{"+m+"} = F_{"+(m-1)+"} + \\nu\\,h_{"+m+"}$<small>$\\sum|r_i|$: "+f2(sa0)+" → "+f2(sa1)+"</small></div>"+
       "<span class='chip "+(best==="экран"?"screen":"ssd")+"'>"+(best==="экран"?"экран":"SSD")+"</span><span class='chip err'>Σ|r| = "+f2(sa1)+"</span><span class='chev'>›</span></summary><div class='step-body'>";
 
     /* A */
     html+="<div class='stage'><h4><span class='l'>A</span>Остатки текущей модели $F_{"+(m-1)+"}$ <a href='#t-grad' style='font-weight:500;font-size:12.5px'>п. 2</a></h4>"+
       "<div class='expl'>$r_i = y_i - F_{"+(m-1)+"}(x_i)$ — антиградиент квадратичной потери, то есть «что модель ещё не выучила». Знак минус — завысили, плюс — занизили.<ul>"+
       names.map(function(n,i){return "<li>$r_"+n+" = "+f2(y[i])+" - "+f2(Fp[i])+" = "+f2(r[i])+"$</li>";}).join("")+"</ul>Сумма модулей $\\sum|r_i| = "+f2(sa0)+"$, сумма квадратов $\\sum r_i^2 = "+f2(ss0)+"$.</div>"+
-      "<div class='tbl'><table><thead><tr><th class='k'>Ноутбук</th><th>F_"+(m-1)+"(xᵢ)</th><th>yᵢ</th><th>rᵢ = yᵢ − F</th><th>|rᵢ|</th></tr></thead><tbody>"+
+      "<div class='tbl'><table><thead><tr><th class='k'>Ноутбук</th><th>$F_{"+(m-1)+"}(x_i)$</th><th>$y_i$</th><th>$r_i = y_i - F_{"+(m-1)+"}(x_i)$</th><th>$|r_i|$</th></tr></thead><tbody>"+
       names.map(function(n,i){return "<tr>"+td(n,"k")+td(f2(Fp[i]))+td(f2(y[i]))+td(f2(r[i]),"res "+cls(r[i]))+td(f2(Math.abs(r[i])))+"</tr>";}).join("")+"</tbody></table></div></div>";
 
     /* B */
@@ -497,20 +499,20 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
       rowsB.push("<tr>"+td(k==="экран"?"экран":"SSD","k")+td(esc(GROUP_LABEL[k][g]),"txt")+td(G.members.join(", "),"txt")+td(f2(G.sum),cls(G.sum))+td(G.n)+td(f2(G.gamma),"res "+cls(G.gamma))+td(f2(G.sse))+"</tr>"); }); });
     html+="<div class='stage'><h4><span class='l'>B</span>Группировка по колонкам и поправки групп <a href='#t-group' style='font-weight:500;font-size:12.5px'>п. 3</a></h4>"+
       "<div class='expl'>Каждая колонка делит объекты на две группы; группа получает одно число $\\gamma_G$ — среднее её остатков, потому что именно среднее минимизирует $\\sum_{i\\in G}(r_i-\\gamma)^2$. Группируем по признаку, а не по остаткам: признак известен у любого нового объекта, остаток — нет.<ul>"+liB.join("")+"</ul></div>"+
-      "<div class='tbl'><table><thead><tr><th class='k'>Колонка</th><th>Группа G</th><th>Состав</th><th>Σ rᵢ</th><th>|G|</th><th>γ_G = Σrᵢ / |G|</th><th>остаётся Σ(rᵢ − γ_G)²</th></tr></thead><tbody>"+rowsB.join("")+"</tbody></table></div></div>";
+      "<div class='tbl'><table><thead><tr><th class='k'>Колонка</th><th>Группа $G$</th><th>Состав</th><th>$\\sum_{i\\in G} r_i$</th><th>$|G|$</th><th>$\\gamma_G = \\sum_{i\\in G} r_i \\,/\\, |G|$</th><th>остаётся $\\sum_{i\\in G}(r_i - \\gamma_G)^2$</th></tr></thead><tbody>"+rowsB.join("")+"</tbody></table></div></div>";
 
     /* C */
     html+="<div class='stage'><h4><span class='l'>C</span>Выбор колонки по наименьшей оставшейся ошибке <a href='#t-choice' style='font-weight:500;font-size:12.5px'>п. 4</a></h4>"+
       "<div class='expl'>Складываем ошибку, оставшуюся в обеих группах каждой колонки, и берём минимум: экран: $"+c["экран"].order.map(function(g){return f2(c["экран"].groups[g].sse);}).join(" + ")+" = "+f2(c["экран"].sse)+"$;&nbsp; SSD: $"+c["ssd"].order.map(function(g){return f2(c["ssd"].groups[g].sse);}).join(" + ")+" = "+f2(c["ssd"].sse)+"$. "+
       "Минимум у <b>"+(best==="экран"?"экрана":"SSD")+"</b>"+(isFinite(ratio)&&ratio>1?" (в "+f2(Math.round(ratio*100)/100)+" раза меньше)":"")+" — значит $h_{"+m+"}$ строится по этой колонке, и каждому объекту достаётся $\\gamma$ его группы.</div>"+
-      "<div class='tbl'><table><thead><tr><th class='k'>Колонка j</th><th>остаётся Σ(rᵢ − γ)² по обеим группам</th><th>Выбор j* = argmin</th></tr></thead><tbody>"+
+      "<div class='tbl'><table><thead><tr><th class='k'>Колонка $j$</th><th>остаётся $\\sum_{G}\\sum_{i\\in G}(r_i - \\gamma_G)^2$</th><th>Выбор $j^* = \\arg\\min_j$</th></tr></thead><tbody>"+
       ["экран","ssd"].map(function(k){return "<tr>"+td(k==="экран"?"экран":"SSD","k")+td(f2(c[k].sse))+td(k===best?"◀ выбрана":"",k===best?"pick":"txt")+"</tr>";}).join("")+"</tbody></table></div></div>";
 
     /* D */
     html+="<div class='stage'><h4><span class='l'>D</span>Обновление модели с темпом ν = "+f2(lr)+" <a href='#t-lr' style='font-weight:500;font-size:12.5px'>п. 5</a></h4>"+
       "<div class='expl'>$F_{"+m+"}(x_i) = F_{"+(m-1)+"}(x_i) + \\nu\\,h_{"+m+"}(x_i)$ — прибавляем только долю $\\nu = "+f2(lr)+"$ поправки.<ul>"+
       names.map(function(n,i){return "<li>$F_{"+m+"}("+n+") = "+f2(Fp[i])+" + "+f2(lr)+"\\cdot"+sg(h[i])+" = "+f2(Fn[i])+"$, новый остаток $"+f2(y[i])+" - "+f2(Fn[i])+" = "+f2(rn[i])+"$</li>";}).join("")+"</ul></div>"+
-      "<div class='tbl'><table><thead><tr><th class='k'>Ноутбук</th><th>F_"+(m-1)+"(xᵢ)</th><th>h_"+m+"(xᵢ) по «"+(best==="экран"?"экран":"SSD")+"»</th><th>ν·h_"+m+"</th><th>F_"+m+"(xᵢ)</th><th>yᵢ</th><th>новый rᵢ</th><th>|rᵢ|</th><th>rᵢ²</th></tr></thead><tbody>"+
+      "<div class='tbl'><table><thead><tr><th class='k'>Ноутбук</th><th>$F_{"+(m-1)+"}(x_i)$</th><th>$h_{"+m+"}(x_i)$ по «"+(best==="экран"?"экран":"SSD")+"»</th><th>$\\nu\\,h_{"+m+"}(x_i)$</th><th>$F_{"+m+"}(x_i)$</th><th>$y_i$</th><th>новый $r_i$</th><th>$|r_i|$</th><th>$r_i^2$</th></tr></thead><tbody>"+
       names.map(function(n,i){return "<tr>"+td(n,"k")+td(f2(Fp[i]))+td(f2(h[i]),cls(h[i]))+td(f2(lr*h[i]),cls(h[i]))+td(f2(Fn[i]),"res")+td(f2(y[i]))+td(f2(rn[i]),"res "+cls(rn[i]))+td(f2(Math.abs(rn[i])))+td(f2(rn[i]*rn[i]))+"</tr>";}).join("")+"</tbody></table></div>"+
       "<div class='step-foot'><b>Итог шага "+m+":</b> $\\sum|r_i| = "+f2(sa1)+"$ (было "+f2(sa0)+"), $\\sum r_i^2 = "+f2(ss1)+"$ (было "+f2(ss0)+"). Невыученная часть вклада колонки «"+(best==="экран"?"экран":"SSD")+"» умножилась на $(1-\\nu) = "+f2(1-lr)+"$: из "+f2(hmax)+" осталось "+f2(left)+(lr<1?" — на следующем шаге эта колонка выиграет, только если "+f2(left)+" всё ещё больше невыученного вклада другой колонки.":" — при ν = 1 вклад выучен полностью за один шаг.")+"</div></div>";
     return html+"</div></details>";
@@ -536,7 +538,7 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
     var det=[
       {t:"A · где применяется формула остатка", h:
         "<p><b>Когда.</b> В самом начале каждого шага: смотрим, насколько текущая модель ошибается на каждом ноутбуке. На шаге 1 модель $F_0$ ещё ничего не выучила и всем предсказывает среднее "+f2(Fp[0])+", поэтому $m=1$, $F_{m-1}=F_0$.</p>"+
-        "<div class='tbl'><table><thead><tr><th class='k'>Ноутбук</th><th>$y_i$ (реальная)</th><th>$F_0(x_i)$</th><th>$r_i = y_i - F_0$</th></tr></thead><tbody>"+rowsA+"</tbody></table></div>"+
+        "<div class='tbl'><table><thead><tr><th class='k'>Ноутбук</th><th>$y_i$ (реальная)</th><th>$F_0(x_i)$</th><th>$r_i = y_i - F_0(x_i)$</th></tr></thead><tbody>"+rowsA+"</tbody></table></div>"+
         "<p><b>Как читать.</b> Минус — модель завысила цену (A: предсказали "+f2(Fp[0])+", на деле "+f2(y[0])+"), плюс — занизила (D). Остаток — это то, что модели ещё предстоит выучить.</p>"+
         "<p><b>Почему «антиградиент».</b> Для квадратичной потери $L=\\tfrac12(y-F)^2$ производная по $F$ равна $-(y-F)$. Антиградиент — направление, куда двигать $F$, чтобы ошибка уменьшилась, — равен $y-F$, то есть остатку. Поэтому следующее дерево $h_m$ учится предсказывать остатки: это и есть шаг градиентного спуска.</p>"+
         "<p><b>Куда дальше.</b> Остатки "+r.map(f2).join(", ")+" уходят на этап B. На шаге 2 формула применяется снова, но уже с $F_1$: $r_A = "+f2(y[0])+" - "+f2(Fn[0])+" = "+f2(rn[0])+"$ — остатки стали меньше, модель подучилась.</p>"},
@@ -582,9 +584,9 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
     var y=getY(), res=run(y,LR,N); lastRes=res;
     var hs=res.hist, e=hs.map(function(h,m){return m===0?sumAbs(h.r):sumAbs(h.rn);}), q=hs.map(function(h,m){return m===0?sumSq(h.r):sumSq(h.rn);});
     document.getElementById("stats").innerHTML=
-      "<div class='stat'><h4>F₀ = ȳ</h4><div class='big'>"+f2(res.F0)+"</div><div class='calc'>("+y.join(" + ")+") / 4</div></div>"+
-      "<div class='stat'><h4>Σ|rᵢ| на старте</h4><div class='big'>"+f2(e[0])+"</div><div class='calc'>"+hs[0].r.map(function(v){return f2(Math.abs(v));}).join(" + ")+"</div></div>"+
-      "<div class='stat'><h4>Σ|rᵢ| после "+N+" шагов</h4><div class='big'>"+f2(e[N])+"</div><div class='calc'>×"+f2(Math.round((e[N]/e[0])*1e6)/1e6)+" от старта</div></div>"+
+      "<div class='stat'><h4>$F_0 = \\bar y$</h4><div class='big'>"+f2(res.F0)+"</div><div class='calc'>("+y.join(" + ")+") / 4</div></div>"+
+      "<div class='stat'><h4>$\\sum|r_i|$ на старте</h4><div class='big'>"+f2(e[0])+"</div><div class='calc'>"+hs[0].r.map(function(v){return f2(Math.abs(v));}).join(" + ")+"</div></div>"+
+      "<div class='stat'><h4>$\\sum|r_i|$ после "+N+" шагов</h4><div class='big'>"+f2(e[N])+"</div><div class='calc'>×"+f2(Math.round((e[N]/e[0])*1e6)/1e6)+" от старта</div></div>"+
       "<div class='stat'><h4>Выборы колонок</h4><div class='big' style='font-size:16px'>"+hs.slice(1).map(function(h){return h.best==="экран"?"Э":"S";}).join("")+"</div><div class='calc'>Э — экран, S — SSD, по порядку шагов</div></div>";
     document.querySelector("#tSummary tbody").innerHTML=hs.map(function(h,m){
       if(m===0) return "<tr>"+td(0,"k")+td("— (F₀ = среднее)","txt")+td(f2(e[0]))+td(f2(q[0]))+td("")+td("")+"</tr>";
@@ -598,7 +600,7 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
     document.getElementById("findList").innerHTML=findings(res,LR);
     var isDef=y.every(function(v,i){return v===DEF[i];})&&LR===0.5&&N===20;
     document.getElementById("status").innerHTML=(isDef?"Исходный пример":"Ваши параметры")+": ν = <b>"+f2(LR)+"</b>, "+N+" шагов, ошибка <b>"+f2(e[0])+" → "+f2(e[N])+"</b>";
-    renderMath(document.getElementById("summary")); renderMath(document.getElementById("stageTable")); renderMath(document.getElementById("exDetails")); renderMath(box); renderMath(document.getElementById("findings"));
+    renderMath(document.getElementById("summary")); renderMath(document.getElementById("data")); renderMath(document.getElementById("stageTable")); renderMath(document.getElementById("exDetails")); renderMath(box); renderMath(document.getElementById("findings"));
     drawAll();
   }
   function drawAll(){ if(!lastRes) return; var y=getY(); drawConv(lastRes,y); drawErr(lastRes); drawPick(lastRes,LR); drawCompare(y,LR); }
