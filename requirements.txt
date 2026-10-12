@@ -11,6 +11,7 @@
 # --- Научный стек ---
 numpy>=1.26
 pandas>=2.1
+openpyxl>=3.1        # Excel-версии дополнительных уроков (extra/*/build_excel.py)
 scipy>=1.11
 scikit-learn>=1.6          # FrozenEstimator, TargetEncoder (примеры 15, 28)
 matplotlib>=3.10

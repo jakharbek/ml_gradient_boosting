@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Excel-пособие: градиентный бустинг с learning rate, 20 шагов.
-Листы: Содержание · Теория · Сводка (графики) · Шаги (20 сворачиваемых блоков A–D с живыми пояснениями)."""
+"""Excel-версия дополнительного урока 02 «Learning rate: 20 шагов бустинга».
+
+Запуск: python extra/02_learning_rate/build_excel.py  →  boosting_learning_rate.xlsx рядом со скриптом.
+Листы: Содержание · Теория · Сводка (графики) · Шаги (20 сворачиваемых блоков A–D с живыми пояснениями).
+Все 1700+ ячеек — формулы; входы — только жёлтые ячейки (цены и ν)."""
+from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.chart import LineChart, BarChart, Reference, Series
@@ -347,5 +351,5 @@ for t in ["Жёлтые ячейки на листе «Шаги» — единс
 
 wb.active = 0
 wb.calculation.fullCalcOnLoad = True
-wb.save("boosting_learning_rate.xlsx")
+wb.save(Path(__file__).with_name("boosting_learning_rate.xlsx"))
 print("ok")

@@ -222,6 +222,7 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
     <a href="#steps">Все 20 шагов</a>
     <a href="#compare">Сравнение ν</a>
     <a href="#findings">Выводы</a>
+    <a href="#materials">Материалы</a>
   </nav>
 </aside>
 
@@ -344,7 +345,18 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
   </details>
 </section>
 
-<footer>Дополнительный урок курса «Градиентный бустинг по косточкам». Продолжение темы — <a href="../../lessons/lesson_4_1/web/index.html">урок 4.1 «Бустинг на остатках вручную»</a> и <a href="../../lessons/lesson_7/web/index.html">модуль 7 «Регуляризация»</a>. Все вычисления выполняются в браузере; тот же расчёт в Jupyter, каждый шаг отдельными ячейками — <a href="notebook.html">выполненный ноутбук</a>, <a href="notebook.ipynb">notebook.ipynb</a>, генератор <a href="gen_notebook.py">gen_notebook.py</a>; тот же расчёт в Excel — <a href="boosting_learning_rate.xlsx">boosting_learning_rate.xlsx</a> (четыре листа, всё формулами).</footer>
+
+<!-- MATERIALS -->
+<section class="card" id="materials">
+  <div class="sec-head"><div class="badge">⤓</div><div><h2>Материалы урока</h2><p class="sub">Тот же расчёт в трёх формах. Числа во всех совпадают с этой страницей при ν = 0.5 и исходных ценах.</p></div></div>
+  <div class="grid">
+    <div class="stat"><h4>Excel · 4 листа</h4><p style="margin:4px 0 10px;color:var(--ink-2);font-size:14px">Содержание · Теория · Сводка с графиками (лог-шкала) · Шаги: 20 сворачиваемых блоков A–D с живыми пояснениями. 1711 формул, входы — жёлтые ячейки.</p><a class="btn primary" href="boosting_learning_rate.xlsx" download>Скачать .xlsx</a> <a class="btn" href="build_excel.py">генератор</a></div>
+    <div class="stat"><h4>Jupyter · каждый шаг отдельно</h4><p style="margin:4px 0 10px;color:var(--ink-2);font-size:14px">190 ячеек без цикла по шагам: пояснение, этапы A–D таблицами и график каждого шага. 22 рисунка.</p><a class="btn primary" href="notebook.html">Открыть выполненный</a> <a class="btn" href="notebook.ipynb" download>.ipynb</a> <a class="btn" href="gen_notebook.py">генератор</a></div>
+    <div class="stat"><h4>Colab</h4><p style="margin:4px 0 10px;color:var(--ink-2);font-size:14px">Тот же ноутбук в браузере, без установки: Runtime → Run all.</p><a class="btn" href="https://colab.research.google.com/github/jakharbek/ml_gradient_boosting/blob/main/extra/02_learning_rate/notebook.ipynb" target="_blank" rel="noopener">Открыть в Colab</a></div>
+  </div>
+</section>
+
+<footer>Дополнительный урок курса «Градиентный бустинг по косточкам». Продолжение темы — <a href="../../lessons/lesson_4_1/web/index.html">урок 4.1 «Бустинг на остатках вручную»</a> и <a href="../../lessons/lesson_7/web/index.html">модуль 7 «Регуляризация»</a>. Все вычисления выполняются в браузере; Excel, ноутбук и Colab — в разделе <a href="#materials">«Материалы урока»</a>.</footer>
 </main>
 </div>
 <button class="btn totop" id="totop" title="Наверх">↑</button>

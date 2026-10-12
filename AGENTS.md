@@ -29,7 +29,9 @@
    Меняете одно — меняйте другое и прогоняйте `pytest` (тест `test_parity.py`).
 6. **Не редактируйте сгенерированные файлы:** `lessons/*/jupyter_notebooks/*.ipynb`,
    `lessons/*/README.md`, `lessons/*/data/*`, `shared/web/js/generated/*`, блок
-   `<!-- curriculum -->` в корневом `README.md`. Правьте источники и запускайте `tools/build.py`.
+   `<!-- curriculum -->` в корневом `README.md`, а также `extra/*/*.xlsx` и `extra/*/notebook.*`
+   (их собирают `extra/*/build_excel.py` и `gen_notebook.py`; тест `tests/python/test_extra_excel.py`).
+   Правьте источники и запускайте `tools/build.py`.
 7. **Веб-часть без сборщика.** Обычные скрипты (не ES-модули), глобальный объект `GBC`,
    страницы работают и по `http://`, и с диска (`file://`). Внешние библиотеки — только с CDN
    (KaTeX, highlight.js, CodeMirror 5, Pyodide) и курс должен работать без них (деградация
