@@ -154,6 +154,112 @@ summary
 # %% [markdown]
 # Ровно то, что было в Excel: три шага экран, потом SSD, потом чередование; ошибка 600 → 300 → 150 → 120 → 75 → …
 #
+# ## 4a. Все 20 шагов подробно: этапы A–D с формулами и числами
+#
+# Сводка выше показывает *что* получилось. Ниже — *почему* на каждом шаге получилось именно это.
+# Для каждого шага $m$ четыре этапа, и у каждой величины — её формула, подстановка чисел и смысл:
+#
+# | Этап | Что считаем | Формула | Основание |
+# |---|---|---|---|
+# | **A** | остатки | $r_i = y_i - F_{m-1}(x_i)$ | $r_i = -\partial L/\partial F$ при $L=\tfrac12(y-F)^2$: остаток — антиградиент потери |
+# | **B** | поправки групп | $\gamma_G = \frac{1}{\lvert G\rvert}\sum_{i\in G} r_i$ | $\arg\min_\gamma \sum_{i\in G}(r_i-\gamma)^2$ — среднее минимизирует сумму квадратов |
+# | **C** | выбор колонки | $j^*=\arg\min_j \sum_{G\in j}\sum_{i\in G}(r_i-\gamma_G)^2$ | берём колонку, после которой ошибки остаётся меньше всего |
+# | **D** | обновление | $F_m(x_i)=F_{m-1}(x_i)+\nu\,h_m(x_i)$ | $\nu<1$ — регуляризация Фридмана: шаг заведомо неполный |
+#
+# Числа в тексте не напечатаны вручную — они подставляются из расчёта, так что при другом $\nu$ или других ценах
+# пояснения пересчитаются вместе с таблицами.
+
+# %%
+from IPython.display import display, Markdown
+
+def f2(v):
+    """Число для текста: без хвостовых нулей, со знаком у отрицательных."""
+    s = f"{v:.4f}".rstrip("0").rstrip(".")
+    return s if s not in ("", "-0") else "0"
+
+def sgn(v):
+    return f"({f2(v)})" if v < 0 else f2(v)
+
+def explain_step(m, F_prev, lr):
+    """Печатает полный разбор шага m (этапы A–D) и возвращает F_m."""
+    names = list(df.index)
+    r = y - F_prev
+    cands = {name: fit_stump(r, vals) for name, vals in FEATURES.items()}
+    best = min(cands, key=lambda k: cands[k][2])
+    h = cands[best][0]
+    F_new = F_prev + lr * h
+
+    md = [f"### Шаг {m}:  $F_{{{m}}} = F_{{{m-1}}} + \\nu\\,h_{{{m}}}$,  $\\nu = {lr}$"]
+
+    # ---- A ----
+    md.append(f"**A. Остатки текущей модели $F_{{{m-1}}}$.**  $r_i = y_i - F_{{{m-1}}}(x_i)$ — антиградиент квадратичной потери, "
+              f"«что модель ещё не выучила». "
+              + "; ".join(f"$r_{n} = {f2(y[i])} - {f2(F_prev[i])} = {f2(r[i])}$" for i, n in enumerate(names)) + ".")
+    tA = pd.DataFrame({f"F_{m-1}(x)": F_prev, "y": y, "r = y − F": r, "|r|": np.abs(r)}, index=names).round(4)
+    md.append(f"Сумма модулей $\\sum|r_i| = {f2(np.abs(r).sum())}$, сумма квадратов $\\sum r_i^2 = {f2((r**2).sum())}$.")
+
+    # ---- B ----
+    rowsB, textB = [], []
+    for col, (corr, groups, sse) in cands.items():
+        for g, info in groups.items():
+            mem = info["members"]; i1, i2 = [names.index(x) for x in mem]
+            rowsB.append({"колонка": col, "группа": g, "состав": ", ".join(mem), "Σ r": info["sum"], "|G|": info["n"],
+                          "γ_G = Σr / |G|": info["gamma"], "остаётся Σ(r−γ)²": info["sse_after"]})
+            textB.append(f"{col} {g} = {{{', '.join(mem)}}}: $\\gamma = ({sgn(r[i1])} + {sgn(r[i2])})/2 = {f2(info['gamma'])}$, "
+                         f"остаётся $({sgn(r[i1])} - {sgn(info['gamma'])})^2 + ({sgn(r[i2])} - {sgn(info['gamma'])})^2 = {f2(info['sse_after'])}$")
+    md.append("**B. Группировка по колонкам.** Каждая колонка делит объекты на две группы; группа получает одно число "
+              "$\\gamma_G$ — среднее её остатков, потому что именно среднее минимизирует $\\sum_{i\\in G}(r_i-\\gamma)^2$. "
+              "Группируем по признаку, а не по остаткам: признак известен у любого нового объекта, остаток — нет.  \n"
+              + "  \n".join("• " + t for t in textB) + ".")
+    tB = pd.DataFrame(rowsB).set_index(["колонка", "группа"]).round(4)
+
+    # ---- C ----
+    sse = {k: v[2] for k, v in cands.items()}
+    other = [k for k in sse if k != best][0]
+    ratio = sse[other] / sse[best] if sse[best] > 0 else float("inf")
+    md.append(f"**C. Выбор колонки.** Складываем ошибку, оставшуюся в обеих группах каждой колонки, и берём минимум: "
+              + ";  ".join(f"{k}: $" + " + ".join(f2(i['sse_after']) for i in v[1].values()) + f" = {f2(v[2])}$" for k, v in cands.items())
+              + f".  $\\min$ у **{best}**" + (f" (в {f2(ratio)} раза меньше, чем у {other})" if ratio != float('inf') else "")
+              + f" — значит $h_{{{m}}}$ строится по колонке «{best}», и каждому объекту достаётся $\\gamma$ его группы.")
+    tC = pd.DataFrame({"остаётся Σ(r−γ)² по обеим группам": sse}).round(4)
+    tC["выбор"] = ["◀ выбрана" if k == best else "" for k in tC.index]
+
+    # ---- D ----
+    md.append(f"**D. Обновление модели.** $F_{{{m}}}(x_i) = F_{{{m-1}}}(x_i) + \\nu\\,h_{{{m}}}(x_i)$, прибавляем только долю "
+              f"$\\nu = {lr}$ поправки.  \n"
+              + "  \n".join(f"• $F_{{{m}}}({n}) = {f2(F_prev[i])} + {lr}\\cdot{sgn(h[i])} = {f2(F_new[i])}$, новый остаток "
+                            f"${f2(y[i])} - {f2(F_new[i])} = {f2(y[i]-F_new[i])}$" for i, n in enumerate(names)) + ".")
+    r_new = y - F_new
+    tD = pd.DataFrame({f"F_{m-1}(x)": F_prev, f"h_{m}(x) по «{best}»": h, f"ν·h_{m}": lr * h, f"F_{m}(x)": F_new,
+                       "y": y, "новый r": r_new, "|r|": np.abs(r_new), "r²": r_new**2}, index=names).round(4)
+    left = (1 - lr) * np.abs(h).max()
+    md.append(f"Итог шага: $\\sum|r_i| = {f2(np.abs(r_new).sum())}$ (было {f2(np.abs(r).sum())}), "
+              f"$\\sum r_i^2 = {f2((r_new**2).sum())}$ (было {f2((r**2).sum())}). "
+              f"Невыученная часть вклада колонки «{best}» умножилась на $(1-\\nu) = {f2(1-lr)}$: "
+              f"из {f2(np.abs(h).max())} осталось {f2(left)} — поэтому на следующем шаге эта колонка выиграет только если "
+              f"{f2(left)} всё ещё больше невыученного вклада другой колонки.")
+
+    display(Markdown(md[0])); display(Markdown(md[1])); display(tA); display(Markdown(md[2]))
+    display(Markdown(md[3])); display(tB); display(Markdown(md[4])); display(tC)
+    display(Markdown(md[5])); display(tD); display(Markdown(md[6])); display(Markdown("---"))
+    return F_new
+
+F_cur = np.full(4, F0)
+display(Markdown(f"**Старт:** $F_0 = \\bar y = {f2(F0)}$ для всех объектов (среднее — минимум $\\sum(y_i-c)^2$)."))
+for m in range(1, N + 1):
+    F_cur = explain_step(m, F_cur, LR)
+
+# %% [markdown]
+# ### Что видно из 20 шагов
+#
+# 1. **Шаги 1–3 — экран.** Его невыученный вклад 150 → 75 → 37.5 → 18.75 всё время больше вклада SSD (30), и критерий C
+#    трижды выбирает экран.
+# 2. **Шаг 4 — первое переключение.** 18.75 < 30: теперь SSD объясняет больше, и модель берёт его.
+# 3. **Шаги 5–20 — чередование.** После каждого шага «проигравшая» колонка оказывается с большим невыученным куском,
+#    поэтому они сменяют друг друга строго по очереди, а обе величины убывают в геометрической прогрессии.
+# 4. **Ошибка не обнуляется.** На 20-м шаге $\sum|r_i| \approx 0.29$: каждый шаг умножает её на $(1-\nu)$, и ни при каком
+#    конечном числе шагов множитель не становится нулём. Это свойство, а не недостаток: модель можно остановить в любой момент.
+#
 # ## 5. Графики
 #
 # ### 5.1. Как предсказания сходятся к реальным ценам
