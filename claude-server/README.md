@@ -23,10 +23,9 @@ node server.js
 
 **Без клонирования репозитория.** С сайта курса можно скачать архив
 `claude-server.zip` (кнопка в панели ИИ-ассистента или `https://jakharbek.github.io/ml_gradient_boosting/claude-server.zip`),
-распаковать и запустить `start.cmd` (Windows) или `./start.sh` (macOS/Linux). Эти скрипты
-добавляют адрес сайта курса в `CLAUDE_SERVER_ALLOWED_ORIGINS`, чтобы страницы на GitHub Pages
-могли обращаться к серверу на вашем компьютере; просто `node server.js` разрешает только
-localhost и `file://`.
+распаковать и запустить `node server.js` (или `npm start`, `start.cmd`, `./start.sh` — всё
+равнозначно). Адрес сайта курса `https://jakharbek.github.io` разрешён по умолчанию вместе с
+localhost и `file://`; другие адреса — через `CLAUDE_SERVER_ALLOWED_ORIGINS`.
 
 По умолчанию слушает `http://127.0.0.1:8137` (только localhost).
 
@@ -40,7 +39,7 @@ localhost и `file://`.
 | `CLAUDE_SERVER_TIMEOUT_MS`| `9000000`    | Таймаут одного запроса к `claude` (мс, 150 мин)         |
 | `CLAUDE_BIN`               | `claude`     | Путь/имя бинарника CLI                                  |
 | `CLAUDE_SERVER_ALLOW_TOOLS`| не задан    | `1` — разрешить запросам поля `allow_tools`, `permission_mode`, `cwd`, `session_id` (см. «Безопасность») |
-| `CLAUDE_SERVER_ALLOWED_ORIGINS` | не задан | Дополнительные origin браузерных страниц через запятую (localhost и `file://` разрешены всегда) |
+| `CLAUDE_SERVER_ALLOWED_ORIGINS` | не задан | Дополнительные origin браузерных страниц через запятую (localhost, `file://` и сайт курса `https://jakharbek.github.io` разрешены всегда) |
 
 ## Эндпоинты
 

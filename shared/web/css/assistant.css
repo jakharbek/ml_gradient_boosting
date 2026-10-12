@@ -776,6 +776,18 @@ body.assistant-shooting .toast {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+.assistant .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.assistant .btn svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
 .assistant .btn.small {
   padding: 4px 10px;
   font-size: 0.82rem;

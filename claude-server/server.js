@@ -61,6 +61,10 @@ const EXTRA_ORIGINS = new Set(
     .map((s) => s.trim())
     .filter(Boolean)
 );
+// The course's own published site: readers on GitHub Pages run this server
+// locally, so its origin is allowed out of the box (no env needed).
+const SITE_ORIGINS = ["https://jakharbek.github.io"];
+for (const o of SITE_ORIGINS) EXTRA_ORIGINS.add(o);
 const LOOPBACK_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
@@ -712,7 +716,12 @@ async function handleAsk(req, res) {
 // request browsers send before a JSON POST.
 function applyCors(req, res) {
   const origin = req.headers["origin"];
-  if (origin === undefined || !isAllowedOrigin(origin)) return;
+  if (origin === undefined) return;
+  // GET /health is harmless and is answered with CORS headers for any origin, so a
+  // course page from a non-allowed site can *see* the 403 and explain it to the
+  // reader instead of showing a generic "server not running".
+  const isHealth = req.method === "GET" && req.url.split("?")[0] === "/health";
+  if (!isAllowedOrigin(origin) && !isHealth) return;
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -790,4 +799,5 @@ server.listen(PORT, HOST, () => {
   console.log(`    GET  /health`);
   if (AUTH_TOKEN) console.log("  Auth: Bearer token required");
   console.log(ALLOW_TOOLS ? "  Tools: ENABLED by request (CLAUDE_SERVER_ALLOW_TOOLS=1)" : "  Tools: disabled (text-only answers)");
+  console.log(`  Browser origins: localhost, file://, ${[...EXTRA_ORIGINS].join(", ")}`);
 });

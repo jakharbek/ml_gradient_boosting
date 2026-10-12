@@ -418,13 +418,16 @@
       try {
         const r = await fetch(url + '/health', { signal: ctl.signal, cache: 'no-store' });
         ok = r.ok;
+        state.serverForbidden = r.status === 403; // сервер есть, но не разрешает адрес этой страницы
         // сервер из папки claude-server сообщает {images: true}; старая запущенная копия — нет
         state.serverImages = ok ? !!((await r.json().catch(() => ({}))) || {}).images : null;
       } catch (e) {
         ok = false;
+        state.serverForbidden = false;
       }
       clearTimeout(timer);
     }
+    if (el.forbidden) el.forbidden.hidden = !state.serverForbidden;
     setStatus(ok);
     return ok;
   }
@@ -922,14 +925,23 @@
         'p',
         { class: 'muted' },
         'Нет репозитория под рукой? Скачайте архив, распакуйте и запустите ',
+        H('code', null, 'npm start'),
+        ' (или ',
         H('code', null, 'start.cmd'),
-        ' (Windows) или ',
+        ' / ',
         H('code', null, './start.sh'),
-        ' (macOS/Linux)',
-        remotePage ? ' — эти скрипты разрешают серверу запросы с адреса ' : '.',
-        remotePage ? H('code', null, root.location.origin) : null,
-        remotePage ? '.' : null
+        '). Сайт курса разрешён серверу по умолчанию.'
       ),
+      (el.forbidden = H(
+        'p',
+        { class: 'muted', hidden: true },
+        H('strong', null, 'Сервер запущен, но отвечает 403: '),
+        'он не разрешает адрес этой страницы ',
+        H('code', null, root.location.origin),
+        '. Обновите claude-server (скачайте архив заново) или запустите его с ',
+        H('code', null, 'CLAUDE_SERVER_ALLOWED_ORIGINS=' + root.location.origin),
+        '.'
+      )),
       H('div', { class: 'actions' }, download, retry)
     );
 
