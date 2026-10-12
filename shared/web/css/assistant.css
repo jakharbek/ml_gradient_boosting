@@ -745,3 +745,45 @@ body.assistant-shooting .toast {
     display: none !important;
   }
 }
+
+/* ---------- Служебное, что нужно панели и вне course.css (самостоятельные страницы extra/) ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 120;
+  padding: 9px 16px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--page);
+  font-size: 0.88rem;
+  box-shadow: var(--shadow);
+  transform: translate(-50%, 16px);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.assistant .btn.small {
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  border-radius: 7px;
+  gap: 6px;
+}
+.assistant .btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+}
+.assistant .btn.ghost:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.assistant .btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}

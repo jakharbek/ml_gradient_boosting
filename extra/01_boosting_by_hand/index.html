@@ -101,6 +101,15 @@ footer{color:var(--muted);font-size:13px;margin-top:40px;text-align:center}
 .icon-btn:hover{border-color:var(--teal);color:var(--teal)}
 .icon-btn svg{width:18px;height:18px}
 
+/* ---- поведение страницы при открытой панели ассистента ---- */
+.topwrap{height:var(--topbar-h)}
+.topbar{height:100%;padding-top:0;padding-bottom:0}
+.assistant-toggle[aria-pressed="true"]{border-color:var(--teal);color:var(--teal);background:var(--teal-soft)}
+@media (min-width:1281px){
+  body.assistant-open{padding-right:var(--assistant-w)}
+  body.assistant-open .topwrap{margin-right:calc(-1 * var(--assistant-w));padding-right:var(--assistant-w)}
+}
+
 .status{font-size:14px;color:var(--muted)}
 .status b{color:var(--green)}
 .status b.warn{color:var(--amber)}

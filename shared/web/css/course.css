@@ -2508,26 +2508,7 @@ input.input {
   padding: 10px 16px;
   border-top: 1px solid var(--border);
 }
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  z-index: 120;
-  padding: 9px 16px;
-  border-radius: 10px;
-  background: var(--ink);
-  color: var(--page);
-  font-size: 0.88rem;
-  box-shadow: var(--shadow);
-  transform: translate(-50%, 16px);
-  opacity: 0;
-  transition: opacity 0.2s, transform 0.2s;
-  pointer-events: none;
-}
-.toast.show {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
+/* .toast — в assistant.css (нужен и самостоятельным страницам extra/) */
 
 /* ---------- 17. Служебное -------------------------------------------------------------- */
 .visually-hidden {
