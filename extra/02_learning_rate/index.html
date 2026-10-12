@@ -163,6 +163,9 @@ main details.step[open] .chev{transform:rotate(90deg)}
 main details.deeper{margin:14px 0;border:1px solid var(--line);border-radius:10px;padding:0 16px;background:var(--paper-2)}
 main details.deeper summary{cursor:pointer;font-weight:800;padding:12px 0;color:var(--navy)}
 main details.deeper p{color:var(--ink-2)}
+main details.deeper .deeper-body{padding:0 0 12px}
+main details.deeper ul{margin:6px 0 10px;padding-left:20px}
+main details.deeper li{margin:4px 0}
 .list li{margin:6px 0}
 footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
 .totop{position:fixed;right:16px;bottom:16px;z-index:15;opacity:0;pointer-events:none;transition:opacity .2s}
@@ -299,15 +302,17 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
 <!-- STEPS -->
 <section class="card" id="steps">
   <div class="sec-head"><div class="badge">1…</div><div><h2>Все шаги подробно: этапы A → B → C → D</h2><p class="sub">Каждый шаг — четыре этапа. У каждой величины — формула, подстановка чисел и смысл. Числа живые: при другом ν или других ценах пояснения пересчитываются.</p></div></div>
-  <div class="tbl"><table>
-    <thead><tr><th class="k">Этап</th><th>Что считаем</th><th>Формула</th><th>Основание</th></tr></thead>
+  <div class="tbl"><table id="stageTable">
+    <thead><tr><th class="k">Этап</th><th>Что считаем</th><th>Формула</th><th>Пример, шаг 1</th><th>Основание</th></tr></thead>
     <tbody>
-      <tr><td class="k">A</td><td class="txt">остатки</td><td class="txt">$r_i = y_i - F_{m-1}(x_i)$</td><td class="txt">антиградиент потери (<a href="#t-grad">п. 2</a>)</td></tr>
-      <tr><td class="k">B</td><td class="txt">поправки групп</td><td class="txt">$\gamma_G = \tfrac{1}{|G|}\sum_{i\in G} r_i$</td><td class="txt">среднее минимизирует $\sum(r_i-\gamma)^2$ (<a href="#t-group">п. 3</a>)</td></tr>
-      <tr><td class="k">C</td><td class="txt">выбор колонки</td><td class="txt">$j^*=\arg\min_j \sum_G\sum_{i\in G}(r_i-\gamma_G)^2$</td><td class="txt">меньше остаётся — больше объяснено (<a href="#t-choice">п. 4</a>)</td></tr>
-      <tr><td class="k">D</td><td class="txt">обновление</td><td class="txt">$F_m(x_i)=F_{m-1}(x_i)+\nu\,h_m(x_i)$</td><td class="txt">неполный шаг, регуляризация (<a href="#t-lr">п. 5</a>)</td></tr>
+      <tr><td class="k">A</td><td class="txt">остатки</td><td class="txt">$r_i = y_i - F_{m-1}(x_i)$</td><td class="txt" id="exA"></td><td class="txt">антиградиент потери (<a href="#t-grad">п. 2</a>)</td></tr>
+      <tr><td class="k">B</td><td class="txt">поправки групп</td><td class="txt">$\gamma_G = \tfrac{1}{|G|}\sum_{i\in G} r_i$</td><td class="txt" id="exB"></td><td class="txt">среднее минимизирует $\sum(r_i-\gamma)^2$ (<a href="#t-group">п. 3</a>)</td></tr>
+      <tr><td class="k">C</td><td class="txt">выбор колонки</td><td class="txt">$j^*=\arg\min_j \sum_G\sum_{i\in G}(r_i-\gamma_G)^2$</td><td class="txt" id="exC"></td><td class="txt">меньше остаётся — больше объяснено (<a href="#t-choice">п. 4</a>)</td></tr>
+      <tr><td class="k">D</td><td class="txt">обновление</td><td class="txt">$F_m(x_i)=F_{m-1}(x_i)+\nu\,h_m(x_i)$</td><td class="txt" id="exD"></td><td class="txt">неполный шаг, регуляризация (<a href="#t-lr">п. 5</a>)</td></tr>
     </tbody>
   </table></div>
+  <p class="sub">Где каждая формула применяется и как читать результат — на числах шага 1:</p>
+  <div id="exDetails"></div>
   <div class="steps-tools">
     <button class="btn" id="openAll">Развернуть все</button>
     <button class="btn" id="closeAll">Свернуть все</button>
@@ -500,6 +505,53 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
   }
 
   /* ---------- findings ---------- */
+  /* ---------- примеры к таблице этапов (шаг 1, живые числа) ---------- */
+  function stageExamples(res,lr){
+    var s1=res.hist[1], y=getY(), Fp=s1.Fprev, r=s1.r, c=s1.cands, best=s1.best, other=best==="экран"?"ssd":"экран", h=s1.h, Fn=s1.Fn, rn=s1.rn;
+    var gE=c["экран"], gS=c["ssd"], e1=gE.groups[gE.order[0]], e2=gE.groups[gE.order[1]], s1g=gS.groups[gS.order[0]], s2g=gS.groups[gS.order[1]];
+    var bestName=best==="экран"?"экран":"SSD", otherName=other==="экран"?"экран":"SSD";
+    var ratio=c[best].sse>0? c[other].sse/c[best].sse : null;
+    var full1=Fp[0]+h[0]; // что было бы при ν = 1
+    var altGamma=r[e1.idx[0]], altSse=Math.pow(r[e1.idx[0]]-altGamma,2)+Math.pow(r[e1.idx[1]]-altGamma,2);
+    var ex={
+      A:"$r_A = "+f2(y[0])+" - "+f2(Fp[0])+" = "+f2(r[0])+"$, … $r_D = "+f2(y[3])+" - "+f2(Fp[3])+" = "+f2(r[3])+"$",
+      B:"13\": $("+sg(r[e1.idx[0]])+" + "+sg(r[e1.idx[1]])+")/2 = "+f2(e1.gamma)+"$; 15\": $"+f2(e2.gamma)+"$",
+      C:"экран $"+f2(c["экран"].sse)+"$ против SSD $"+f2(c["ssd"].sse)+"$ → "+bestName,
+      D:"$F_1(A) = "+f2(Fp[0])+" + "+f2(lr)+"\\cdot"+sg(h[0])+" = "+f2(Fn[0])+"$"
+    };
+    var rowsA=names.map(function(n,i){return "<tr>"+td(n,"k")+td(f2(y[i]))+td(f2(Fp[i]))+td(f2(r[i]),"res "+cls(r[i]))+"</tr>";}).join("");
+    var rowsD=names.map(function(n,i){return "<tr>"+td(n,"k")+td(f2(y[i]))+td(f2(Fn[i]))+td(f2(rn[i]),"res "+cls(rn[i]))+"</tr>";}).join("");
+    var det=[
+      {t:"A · где применяется формула остатка", h:
+        "<p><b>Когда.</b> В самом начале каждого шага: смотрим, насколько текущая модель ошибается на каждом ноутбуке. На шаге 1 модель $F_0$ ещё ничего не выучила и всем предсказывает среднее "+f2(Fp[0])+", поэтому $m=1$, $F_{m-1}=F_0$.</p>"+
+        "<div class='tbl'><table><thead><tr><th class='k'>Ноутбук</th><th>$y_i$ (реальная)</th><th>$F_0(x_i)$</th><th>$r_i = y_i - F_0$</th></tr></thead><tbody>"+rowsA+"</tbody></table></div>"+
+        "<p><b>Как читать.</b> Минус — модель завысила цену (A: предсказали "+f2(Fp[0])+", на деле "+f2(y[0])+"), плюс — занизила (D). Остаток — это то, что модели ещё предстоит выучить.</p>"+
+        "<p><b>Почему «антиградиент».</b> Для квадратичной потери $L=\\tfrac12(y-F)^2$ производная по $F$ равна $-(y-F)$. Антиградиент — направление, куда двигать $F$, чтобы ошибка уменьшилась, — равен $y-F$, то есть остатку. Поэтому следующее дерево $h_m$ учится предсказывать остатки: это и есть шаг градиентного спуска.</p>"+
+        "<p><b>Куда дальше.</b> Остатки "+r.map(f2).join(", ")+" уходят на этап B. На шаге 2 формула применяется снова, но уже с $F_1$: $r_A = "+f2(y[0])+" - "+f2(Fn[0])+" = "+f2(rn[0])+"$ — остатки стали меньше, модель подучилась.</p>"},
+      {t:"B · где применяется поправка группы", h:
+        "<p><b>Когда.</b> Сразу после остатков: формула превращает остатки четырёх ноутбуков в одно число на группу. Колонка «экран» делит ноутбуки на 13\" = {"+e1.members.join(", ")+"} и 15\" = {"+e2.members.join(", ")+"}:</p>"+
+        "<ul><li>13\": $\\gamma = \\frac{"+sg(r[e1.idx[0]])+" + "+sg(r[e1.idx[1]])+"}{2} = "+f2(e1.gamma)+"$</li><li>15\": $\\gamma = \\frac{"+sg(r[e2.idx[0]])+" + "+sg(r[e2.idx[1]])+"}{2} = "+f2(e2.gamma)+"$</li>"+
+        "<li>SSD 256: $\\gamma = "+f2(s1g.gamma)+"$, SSD 512: $\\gamma = "+f2(s2g.gamma)+"$</li></ul>"+
+        "<p><b>Почему именно среднее.</b> Дерево не может дать каждому ноутбуку «свой» остаток: внутри группы число одно. Выбираем то $\\gamma$, при котором $\\sum_{i\\in G}(r_i-\\gamma)^2$ наименьшая, — а это среднее. Проверка на группе 13\": при $\\gamma = "+f2(e1.gamma)+"$ остаётся $"+f2(e1.sse)+"$; если взять, например, $\\gamma = "+f2(altGamma)+"$ (остаток первого объекта), остаётся $"+f2(altSse)+"$ — хуже.</p>"+
+        "<p><b>На практике.</b> Это значение листа регрессионного дерева при квадратичной потере. В scikit-learn, XGBoost, LightGBM и CatBoost лист хранит именно такую поправку; ν потом уменьшает её на этапе D (в XGBoost и LightGBM в формуле листа появляется ещё регуляризация, идея та же).</p>"},
+      {t:"C · где применяется выбор колонки", h:
+        "<p><b>Когда.</b> После этапа B: есть кандидаты — колонки «экран» и «SSD», — и нужно выбрать, по какой строить дерево $h_1$. Для каждой колонки $j$ берём обе её группы, внутри считаем $(r_i-\\gamma_G)^2$ — сколько ошибки остаётся после поправки — и складываем. $\\arg\\min$ значит «колонка, у которой эта сумма наименьшая».</p>"+
+        "<ul><li>экран: $"+f2(e1.sse)+" + "+f2(e2.sse)+" = "+f2(c["экран"].sse)+"$</li><li>SSD: $"+f2(s1g.sse)+" + "+f2(s2g.sse)+" = "+f2(c["ssd"].sse)+"$</li></ul>"+
+        "<p>Минимум у <b>"+bestName+"</b>"+(ratio&&ratio>1?" (у "+otherName+" остаётся в "+f2(Math.round(ratio*100)/100)+" раза больше)":"")+", значит $j^*$ = «"+bestName+"»: дерево $h_1$ делит ноутбуки по этой колонке и выдаёт $"+f2(c[best].groups[c[best].order[0]].gamma)+"$ и $"+f2(c[best].groups[c[best].order[1]].gamma)+"$.</p>"+
+        "<p><b>Почему так.</b> Остатки "+r.map(f2).join(", ")+" почти полностью определяются размером экрана: внутри групп 13\" и 15\" они близки, после поправки остаётся мало. У SSD в каждой группе остатки разных знаков ("+f2(r[s1g.idx[0]])+" и "+f2(r[s1g.idx[1]])+"), среднее "+f2(s1g.gamma)+" почти ничего не объясняет.</p>"+
+        "<p><b>На практике.</b> Это поиск лучшего разбиения при построении дерева: библиотеки перебирают признаки (и пороги у числовых) и берут тот, что сильнее уменьшает ошибку. Обычно сравнивают «выигрыш» (gain) — ту же величину с обратным знаком.</p>"},
+      {t:"D · где применяется обновление с ν", h:
+        "<p><b>Когда.</b> Последним: дерево $h_1$ построено, и его поправку добавляют к модели — не целиком, а долю $\\nu = "+f2(lr)+"$. Здесь $m=1$, $F_0 = "+f2(Fp[0])+"$, $h_1$ выдаёт $"+f2(h[0])+"$ для "+e1.members.join(", ")+" и $"+f2(h[2])+"$ для "+e2.members.join(", ")+":</p>"+
+        "<ul><li>$F_1(A) = "+f2(Fp[0])+" + "+f2(lr)+"\\cdot"+sg(h[0])+" = "+f2(Fn[0])+"$</li><li>$F_1(D) = "+f2(Fp[3])+" + "+f2(lr)+"\\cdot"+sg(h[3])+" = "+f2(Fn[3])+"$</li></ul>"+
+        "<div class='tbl'><table><thead><tr><th class='k'>Ноутбук</th><th>$y_i$</th><th>$F_1(x_i)$</th><th>новый $r_i$</th></tr></thead><tbody>"+rowsD+"</tbody></table></div>"+
+        "<p>Сумма модулей упала с "+f2(sumAbs(r))+" до "+f2(sumAbs(rn))+", сумма квадратов с "+f2(sumSq(r))+" до "+f2(sumSq(rn))+".</p>"+
+        "<p><b>Зачем ν.</b> При $\\nu = 1$ мы прибавили бы $"+f2(h[0])+"$ целиком и получили $F_1(A) = "+f2(full1)+"$. Берём долю: модель осторожно приближается к ответу, а не прыгает. Это и есть «неполный шаг, регуляризация»: каждое дерево получает меньше власти, и ошибки одного дерева не портят всю модель.</p>"+
+        "<p><b>Дальше.</b> Новые остатки "+rn.map(f2).join(", ")+" идут в этап A шага 2, и цикл повторяется; невыученный вклад колонки умножается на $(1-\\nu) = "+f2(1-lr)+"$ на каждом шаге. <b>На практике</b> это параметр <code>learning_rate</code> в scikit-learn, LightGBM и CatBoost, <code>eta</code> в XGBoost.</p>"}
+    ];
+    ["A","B","C","D"].forEach(function(k){ document.getElementById("ex"+k).innerHTML=ex[k]; });
+    document.getElementById("exDetails").innerHTML=det.map(function(d){ return "<details class='deeper'><summary>"+d.t+"</summary><div class='deeper-body'>"+d.h+"</div></details>"; }).join("");
+  }
+
   function findings(res,lr){
     var hs=res.hist.slice(1), seq=hs.map(function(h){return h.best;}), first=seq[0], k=0; while(k<seq.length&&seq[k]===first)k++;
     var e0=sumAbs(res.hist[0].r), eN=sumAbs(hs[hs.length-1].rn), exact=eN<1e-9;
@@ -530,10 +582,11 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
     var box=document.getElementById("stepsBox"), openSet={}; [].forEach.call(box.querySelectorAll("details.step"),function(d){ openSet[d.id]=d.open; });
     box.innerHTML=hs.slice(1).map(function(s){ var id="step-"+s.m; var open=(id in openSet)? openSet[id] : s.m<=4; return stepCard(s,y,LR,open); }).join("");
     document.getElementById("stepsNote").textContent="Шаги 1–4 раскрыты, остальные — по клику. Всего "+N+" шагов.";
+    stageExamples(res,LR);
     document.getElementById("findList").innerHTML=findings(res,LR);
     var isDef=y.every(function(v,i){return v===DEF[i];})&&LR===0.5&&N===20;
     document.getElementById("status").innerHTML=(isDef?"Исходный пример":"Ваши параметры")+": ν = <b>"+f2(LR)+"</b>, "+N+" шагов, ошибка <b>"+f2(e[0])+" → "+f2(e[N])+"</b>";
-    renderMath(document.getElementById("summary")); renderMath(box); renderMath(document.getElementById("findings"));
+    renderMath(document.getElementById("summary")); renderMath(document.getElementById("stageTable")); renderMath(document.getElementById("exDetails")); renderMath(box); renderMath(document.getElementById("findings"));
     drawAll();
   }
   function drawAll(){ if(!lastRes) return; var y=getY(); drawConv(lastRes,y); drawErr(lastRes); drawPick(lastRes,LR); drawCompare(y,LR); }
