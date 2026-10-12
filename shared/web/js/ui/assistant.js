@@ -1023,7 +1023,9 @@
   function init() {
     const main = doc.querySelector('main.lesson');
     const id = doc.documentElement.dataset.lesson;
-    const lesson = id && GBC.page && GBC.page.byId ? GBC.page.byId(id) : null;
+    // Урок из манифеста; самостоятельная страница из extra/ описывает себя сама
+    // в window.GBC_EXTRA_LESSON ({id, number, title, subtitle, summary, objectives}).
+    const lesson = (id && GBC.page && GBC.page.byId ? GBC.page.byId(id) : null) || (root.GBC_EXTRA_LESSON && root.GBC_EXTRA_LESSON.id === id ? root.GBC_EXTRA_LESSON : null);
     if (!main || !lesson || el.ask) return; // ассистент — только на страницах уроков
     state.main = main;
     state.lesson = lesson;

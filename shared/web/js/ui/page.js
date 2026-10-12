@@ -622,5 +622,17 @@
     GBC.bus.emit('pageready');
   }
 
-  GBC.page = { init, lessonUrl, byId, setTheme, renderConceptMap, enhance };
+  /**
+   * Самостоятельная страница из extra/ (data-page="extra"): каркас урока не строится,
+   * страница сама описывает себя в window.GBC_EXTRA_LESSON (для ИИ-ассистента) —
+   * здесь только формулы и событие pageready.
+   */
+  function initExtra() {
+    const main = doc.querySelector('main') || doc.body;
+    GBC.math.render(main);
+    doc.documentElement.classList.add('gbc-ready');
+    GBC.bus.emit('pageready');
+  }
+
+  GBC.page = { init, initExtra, lessonUrl, byId, setTheme, renderConceptMap, enhance };
 })(typeof window !== 'undefined' ? window : globalThis);

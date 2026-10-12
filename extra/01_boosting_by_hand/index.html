@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-lesson="extra_01">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,6 +7,10 @@
 <meta name="description" content="Интерактивный одностраничный урок: как работает градиентный бустинг на примере четырёх ноутбуков.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="icon" href="../../shared/web/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../shared/web/css/assistant.css">
+<script>window.GBC_EXTRA_LESSON = {"id":"extra_01","number":"Доп. 01","title":"Градиентный бустинг с нуля, на четырёх ноутбуках","subtitle":"Механика бустинга без формул: стартовое среднее, остатки, две модели-поправки, финальная сумма","summary":"Бустинг складывает цепочку простых моделей, каждая следующая исправляет ошибки суммы предыдущих. Пример на четырёх ноутбуках с ценой, экраном и SSD; поправка прибавляется целиком (learning rate = 1), двух шагов хватает.","objectives":["посчитать остатки и сумму модулей ошибок","понять, что поправка группы — среднее остатков","собрать итоговый прогноз как сумму стартового среднего и поправок"]};</script>
+<script src="../../shared/web/js/boot.js" data-root="../../" data-page="extra"></script>
 <style>
 :root{
   --bg:#f6f4ee; --paper:#ffffff; --ink:#1b1f2a; --muted:#5f6675; --line:#e3dfd4;
@@ -77,13 +81,39 @@ button{font:inherit;font-weight:800;padding:9px 16px;border-radius:10px;border:1
 button.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
 button:hover{filter:brightness(1.05)}
 footer{color:var(--muted);font-size:13px;margin-top:40px;text-align:center}
+.topwrap{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topbar{max-width:980px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px}
+.topbar .crumbs{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .crumbs a{color:var(--muted);text-decoration:none}
+.topbar .crumbs a:hover{color:var(--teal)}
+.topbar .spacer{flex:1}
+.topbar .btn{font-size:13px;padding:7px 12px}
+:root{--ink-2:#3b4252;--paper-2:#faf8f3;--line-2:#efebe2;--amber-soft:#fdf2d8}
+:root[data-theme="dark"]{--ink-2:#c7cdd8;--paper-2:#20252f;--line-2:#262c38;--amber-soft:#3a2d12}
+
+/* ---- мост токенов для ИИ-ассистента курса (shared/web/css/assistant.css) ---- */
+:root{ --accent:var(--teal); --accent-soft:var(--teal-soft); --accent-ink:#ffffff; --accent-hover:var(--navy); --accent-line:var(--teal);
+  --border:var(--line); --border-strong:#cfc8b8; --surface:var(--paper); --surface-2:var(--paper-2); --surface-3:var(--line-2); --page:var(--bg);
+  --shadow-lg:var(--shadow); --ease:cubic-bezier(.2,.7,.2,1); --topbar-h:56px; --sidebar-w:230px; --radius-sm:8px;
+  --critical:var(--red); --critical-soft:#fbe5e2; --critical-text:var(--red); --warn:var(--amber); --warn-soft:var(--amber-soft); --warn-text:var(--amber); --good:var(--green); }
+:root[data-theme="dark"]{ --accent-ink:#0e1320; --border-strong:#3a4252; --critical-soft:#3a1c19; }
+.icon-btn{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);cursor:pointer}
+.icon-btn:hover{border-color:var(--teal);color:var(--teal)}
+.icon-btn svg{width:18px;height:18px}
+
 .status{font-size:14px;color:var(--muted)}
 .status b{color:var(--green)}
 .status b.warn{color:var(--amber)}
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="topwrap"><div class="topbar">
+  <div class="crumbs"><a href="../../index.html">Бустинг по косточкам</a> <span>›</span> <a href="../README.md">Дополнительные уроки</a> <span>›</span> <span>01. Бустинг с нуля</span></div>
+  <div class="spacer"></div>
+  <a class="btn" href="../02_learning_rate/index.html">Урок 02 →</a>
+  <button class="btn" id="themeBtn" title="Переключить тему"><span id="themeIco">◐</span> <span id="themeTxt">Тема</span></button>
+</div></div>
+<main class="lesson wrap">
 
 <header class="hero">
   <a class="eyebrow" href="../../index.html" style="text-decoration:none">← Бустинг по косточкам · дополнительный урок</a>
@@ -177,11 +207,20 @@ footer{color:var(--muted);font-size:13px;margin-top:40px;text-align:center}
   <details><summary>Что дальше: learning rate</summary><p>В настоящем бустинге поправку прибавляют не целиком, а только её часть — например 10 %. Это называется темп обучения (learning rate). Шагов становится больше, зато модель не «перепрыгивает» и лучше работает на новых данных. Это тема следующего урока.</p></details>
 </section>
 
-<footer>Дополнительный урок курса «Градиентный бустинг по косточкам». Продолжение темы — <a href="../../lessons/lesson_4_1/web/index.html">урок 4.1 «Бустинг на остатках вручную»</a>. Все вычисления выполняются в браузере.</footer>
-</div>
+<footer>Непонятно слово или число? Выделите фрагмент и нажмите «Спросить ИИ» (Alt+I) — ассистент курса ответит с учётом этого урока. Дополнительный урок курса «Градиентный бустинг по косточкам». Продолжение темы — <a href="../../lessons/lesson_4_1/web/index.html">урок 4.1 «Бустинг на остатках вручную»</a>. Все вычисления выполняются в браузере.</footer>
+</main>
 
 <script>
 (function(){
+  /* ---------- theme (ключ gbc:theme общий с курсом; boot.js применяет тему до отрисовки) ---------- */
+  var root=document.documentElement;
+  function syncThemeBtn(){ var dark=root.getAttribute("data-theme")==="dark"; var i=document.getElementById("themeIco"), t=document.getElementById("themeTxt"); if(i) i.textContent=dark?"☾":"☀"; if(t) t.textContent=dark?"Тёмная":"Светлая"; }
+  if(!root.getAttribute("data-theme")){ root.setAttribute("data-theme", matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"); }
+  syncThemeBtn();
+  document.getElementById("themeBtn").addEventListener("click",function(){
+    var next=root.getAttribute("data-theme")==="dark"?"light":"dark";
+    if(window.GBC&&GBC.page&&GBC.page.setTheme) GBC.page.setTheme(next); else { root.setAttribute("data-theme",next); try{localStorage.setItem("gbc:theme",JSON.stringify(next));}catch(e){} }
+    syncThemeBtn(); if(typeof drawAll==="function") drawAll(); });
   var DEF=[820,880,1120,1180], names=["A","B","C","D"];
   var inputs=[].slice.call(document.querySelectorAll("input.price"));
   var fmt=function(x){ var r=Math.round(x*100)/100; return (r>0?"+":"")+r; };

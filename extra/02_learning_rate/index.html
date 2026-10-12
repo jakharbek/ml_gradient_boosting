@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-lesson="extra_02">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,9 +7,10 @@
 <meta name="description" content="Дополнительный урок: градиентный бустинг с темпом обучения ν на примере четырёх ноутбуков — все 20 шагов с формулами, числами и графиками.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css">
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/contrib/auto-render.min.js"></script>
+<link rel="icon" href="../../shared/web/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../shared/web/css/assistant.css">
+<script>window.GBC_EXTRA_LESSON = {"id":"extra_02","number":"Доп. 02","title":"Learning rate: двадцать шагов бустинга, каждый с объяснением","subtitle":"Градиентный бустинг с темпом обучения ν на примере четырёх ноутбуков","summary":"Все 20 шагов бустинга с ν < 1: остатки как антиградиент, поправки групп как среднее, выбор колонки по сумме квадратов, обновление F_m = F_{m-1} + ν·h_m. Числа и графики пересчитываются при смене ν и цен.","objectives":["объяснить, почему стартовое предсказание — среднее","показать, что остаток — антиградиент квадратичной потери","вычислить поправку группы и выбрать колонку по критерию","проследить, как ν < 1 замедляет шаг и почему ошибка убывает геометрически, не достигая нуля"]};</script>
+<script src="../../shared/web/js/boot.js" data-root="../../" data-page="extra"></script>
 <style>
 :root{
   --bg:#f6f4ee; --paper:#ffffff; --paper-2:#faf8f3; --ink:#1b1f2a; --ink-2:#3b4252; --muted:#6b7280; --line:#e4dfd4; --line-2:#efebe2;
@@ -38,8 +39,8 @@ code,.mono{font-family:'JetBrains Mono',monospace}
 .katex{font-size:1.02em}
 
 /* top bar */
-.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
-.topbar .in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px}
+.topwrap{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topbar{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px}
 .topbar .crumbs{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .topbar .crumbs a{color:var(--muted);text-decoration:none}
 .topbar .crumbs a:hover{color:var(--teal)}
@@ -166,11 +167,21 @@ details.deeper p{color:var(--ink-2)}
 footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
 .totop{position:fixed;right:16px;bottom:16px;z-index:15;opacity:0;pointer-events:none;transition:opacity .2s}
 .totop.show{opacity:1;pointer-events:auto}
+
+/* ---- мост токенов для ИИ-ассистента курса (shared/web/css/assistant.css) ---- */
+:root{ --accent:var(--teal); --accent-soft:var(--teal-soft); --accent-ink:#ffffff; --accent-hover:var(--navy); --accent-line:var(--teal);
+  --border:var(--line); --border-strong:#cfc8b8; --surface:var(--paper); --surface-2:var(--paper-2); --surface-3:var(--line-2); --page:var(--bg);
+  --shadow-lg:var(--shadow); --ease:cubic-bezier(.2,.7,.2,1); --topbar-h:56px; --sidebar-w:230px; --radius-sm:8px;
+  --critical:var(--red); --critical-soft:#fbe5e2; --critical-text:var(--red); --warn:var(--amber); --warn-soft:var(--amber-soft); --warn-text:var(--amber); --good:var(--green); }
+:root[data-theme="dark"]{ --accent-ink:#0e1320; --border-strong:#3a4252; --critical-soft:#3a1c19; }
+.icon-btn{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);cursor:pointer}
+.icon-btn:hover{border-color:var(--teal);color:var(--teal)}
+.icon-btn svg{width:18px;height:18px}
 </style>
 </head>
 <body>
 
-<div class="topbar"><div class="in">
+<div class="topwrap"><div class="topbar">
   <div class="crumbs"><a href="../../index.html">Бустинг по косточкам</a> <span>›</span> <a href="../README.md">Дополнительные уроки</a> <span>›</span> <span>02. Learning rate</span></div>
   <div class="spacer"></div>
   <a class="btn" href="../01_boosting_by_hand/index.html">← Урок 01</a>
@@ -198,12 +209,13 @@ footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
   </nav>
 </aside>
 
-<main>
+<main class="lesson">
 <header class="hero" id="intro">
   <span class="eyebrow">Дополнительный урок 02 · градиентный бустинг</span>
   <h1>Learning rate: двадцать шагов бустинга, каждый с объяснением</h1>
   <p class="lead">В уроке 01 поправка прибавлялась целиком, и двух шагов хватило. Здесь прибавляем только долю ν — и смотрим, что происходит на каждом из двадцати шагов: откуда берутся числа, по какой формуле, и почему модель выбирает именно эту колонку.</p>
   <div class="idea">F<sub>m</sub>(x) = F<sub>m−1</sub>(x) + ν · h<sub>m</sub>(x). Всё остальное на этой странице — раскрытие одной этой строки.</div>
+  <p class="sub" style="margin-top:12px">Непонятно слово, формула или число? Выделите фрагмент и нажмите «Спросить ИИ» (или Alt+I) — ассистент курса ответит с учётом этого урока и раздела.</p>
 </header>
 
 <!-- DATA & CONTROLS -->
@@ -321,15 +333,15 @@ footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
 
 <script>
 (function(){
-  /* ---------- theme ---------- */
-  var root=document.documentElement, KEY="gb02-theme";
-  function applyTheme(t){ if(t) root.setAttribute("data-theme",t); else root.removeAttribute("data-theme"); var dark=t==="dark"||(!t&&matchMedia("(prefers-color-scheme:dark)").matches);
-    document.getElementById("themeIco").textContent=dark?"☾":"☀"; document.getElementById("themeTxt").textContent=dark?"Тёмная":"Светлая"; }
-  var saved=null; try{saved=localStorage.getItem(KEY);}catch(e){}
-  applyTheme(saved);
+  /* ---------- theme (ключ gbc:theme общий с курсом; boot.js применяет тему до отрисовки) ---------- */
+  var root=document.documentElement;
+  function syncThemeBtn(){ var dark=root.getAttribute("data-theme")==="dark"; var i=document.getElementById("themeIco"), t=document.getElementById("themeTxt"); if(i) i.textContent=dark?"☾":"☀"; if(t) t.textContent=dark?"Тёмная":"Светлая"; }
+  if(!root.getAttribute("data-theme")){ root.setAttribute("data-theme", matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"); }
+  syncThemeBtn();
   document.getElementById("themeBtn").addEventListener("click",function(){
-    var cur=root.getAttribute("data-theme"); var dark=cur==="dark"||(!cur&&matchMedia("(prefers-color-scheme:dark)").matches);
-    var next=dark?"light":"dark"; applyTheme(next); try{localStorage.setItem(KEY,next);}catch(e){} drawAll(); });
+    var next=root.getAttribute("data-theme")==="dark"?"light":"dark";
+    if(window.GBC&&GBC.page&&GBC.page.setTheme) GBC.page.setTheme(next); else { root.setAttribute("data-theme",next); try{localStorage.setItem("gbc:theme",JSON.stringify(next));}catch(e){} }
+    syncThemeBtn(); if(typeof drawAll==="function") drawAll(); });
 
   /* ---------- helpers ---------- */
   var names=["A","B","C","D"], DEF=[820,880,1120,1180];
@@ -344,7 +356,7 @@ footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
   function sumAbs(a){ return sum(a.map(Math.abs)); }
   function sumSq(a){ return sum(a.map(function(x){return x*x;})); }
   function cssVar(n){ return getComputedStyle(root).getPropertyValue(n).trim(); }
-  function renderMath(el){ if(window.renderMathInElement) try{ renderMathInElement(el,{delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],throwOnError:false}); }catch(e){} }
+  function renderMath(el){ if(window.GBC&&GBC.math&&GBC.math.render){ GBC.math.render(el); return; } if(window.renderMathInElement) try{ renderMathInElement(el,{delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],throwOnError:false}); }catch(e){} }
 
   /* ---------- engine ---------- */
   function fitStump(r, vals){

@@ -55,6 +55,7 @@
 │   │   └── cli.py                 # помощник для скриптов examples/ (--save / --no-show)
 │   └── web/
 │       ├── css/course.css     # дизайн-система: токены светлой/тёмной темы, все компоненты
+│       ├── css/assistant.css  # стили ИИ-ассистента (course.css импортирует; extra/ подключают напрямую)
 │       ├── img/               # логотип, favicon
 │       └── js/
 │           ├── boot.js        # единственный скрипт, который подключает страница
@@ -178,6 +179,15 @@ lessons/lesson_4_1/
 * **Тема:** `data-theme` на `<html>`; при смене — событие `GBC.bus 'themechange'` (Plot перерисовывается сам).
 * **Безопасность:** данные вставляются через `textContent` (`GBC.h` делает это сам); `innerHTML` —
   только для доверенной разметки курса.
+* **Самостоятельные страницы (`extra/`).** Своя вёрстка, каркас урока не строится. Чтобы получить
+  ИИ-ассистента и формулы курса: `<html data-lesson="extra_NN">`, `<main class="lesson">` с разделами
+  `<section>` прямо внутри, `<link rel="stylesheet" href="../../shared/web/css/assistant.css">`,
+  `window.GBC_EXTRA_LESSON = {id, number, title, subtitle, summary, objectives}` и
+  `<script src="../../shared/web/js/boot.js" data-root="../../" data-page="extra">`. В этом режиме
+  `boot.js` загружает только `core`, `ui/controls`, `ui/page`, `ui/markdown`, `ui/assistant`, манифест и
+  вызывает `GBC.page.initExtra()` (формулы + `pageready`). Страница сама задаёт токены ассистента
+  (`--accent`, `--border`, `--surface`, `--ink`, …) в своей палитре и имеет `.topbar`, куда ассистент
+  добавляет кнопку. Тема — общий ключ `gbc:theme` через `GBC.page.setTheme`.
 
 ### ИИ-ассистент урока (`ui/assistant.js`, `ui/markdown.js`)
 

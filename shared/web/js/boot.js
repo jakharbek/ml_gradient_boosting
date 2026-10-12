@@ -5,7 +5,8 @@
  *   <script src="../../../shared/web/js/boot.js" data-root="../../../" data-scripts="lesson.js"></script>
  *
  * data-root    — путь от страницы до корня курса;
- * data-page    — "lesson" (по умолчанию) или "home";
+ * data-page    — "lesson" (по умолчанию), "home" или "extra" (самостоятельная страница из extra/:
+ *                своя вёрстка, подключаются только модули ИИ-ассистента, каркас урока не строится);
  * data-scripts — дополнительные скрипты страницы через запятую (относительно страницы).
  *
  * Делает: применяет тему до отрисовки (без «вспышки»), по порядку загружает модули
@@ -77,7 +78,14 @@
 
   // 3) Модули курса — строго по порядку
   var base = root + 'shared/web/js/';
-  var modules = [
+  var modules = page === 'extra' ? [
+    'core.js',
+    'ui/controls.js',
+    'ui/page.js',
+    'ui/markdown.js',
+    'ui/assistant.js',
+    'generated/manifest.js',
+  ] : [
     'core.js',
     'engine/rng.js',
     'engine/datasets.js',
@@ -127,7 +135,8 @@
         console.error('[GBC] модули курса не загрузились — проверьте data-root у boot.js');
         return;
       }
-      window.GBC.page.init();
+      if (page === 'extra') window.GBC.page.initExtra();
+      else window.GBC.page.init();
       gbcReady = true;
       maybeFlushMath();
       if (window.hljs) window.GBC.bus.emit('hljsready');
