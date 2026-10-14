@@ -130,6 +130,34 @@ footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
   body.assistant-open .topwrap{margin-right:calc(-1 * var(--assistant-w));padding-right:var(--assistant-w)}
 }
 body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
+main .simple{counter-reset:ss}
+main .ss{display:grid;grid-template-columns:44px minmax(0,1fr);gap:0 14px;padding:16px 0;border-top:1px solid var(--line-2)}
+main .ss:first-of-type{border-top:0}
+main .ss .n{width:36px;height:36px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
+main .ss h3{margin:6px 0 6px;font-size:17px}
+main .ss p{margin:6px 0;max-width:760px}
+main .ss .one{font-size:18px;font-weight:700;color:var(--ink);background:var(--paper-2);border-radius:10px;padding:10px 14px;margin:10px 0;border-left:4px solid var(--accent)}
+main .poke{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0;background:var(--paper-2)}
+main .poke .btns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+main .poke .btns button{font:inherit;font-weight:700;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+main .poke .btns button:hover{border-color:var(--accent)}
+main .poke .out{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px}
+main .poke .box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+main .poke .box .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+main .poke .box .val{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
+main .poke .verdict{margin-top:10px;padding:10px 12px;border-radius:8px;font-weight:700}
+main .poke .verdict.up{background:var(--red-soft);color:var(--red)}
+main .poke .verdict.down{background:var(--green-soft);color:var(--green)}
+main .poke .verdict.zero{background:var(--amber-soft);color:var(--ink)}
+main .four{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0}
+main .four .f{border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center;background:var(--surface);opacity:.45}
+main .four .f.live{opacity:1;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+main .four .f b{display:block;font-size:13px;color:var(--muted)} main .four .f span{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+main .four .f small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+main .colvec{display:inline-grid;gap:4px;padding:8px 14px;border-left:2px solid var(--ink);border-right:2px solid var(--ink);border-radius:8px;font-variant-numeric:tabular-nums;font-weight:700;margin:6px 12px 6px 0;vertical-align:middle}
+main .colvec div{display:grid;grid-template-columns:28px 80px;gap:8px}
+main .colvec .lbl{color:var(--muted);font-weight:500}
+@media(max-width:600px){main .four{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -143,6 +171,7 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
 <div class="layout">
 <aside class="toc"><h4>Содержание</h4><nav id="toc">
   <a href="#intro">Вопрос</a>
+  <a href="#simple">Совсем просто</a>
   <a href="#gd">Что такое спуск</a>
   <a href="#loss">Потеря как функция F</a>
   <a href="#partial">Частные производные</a>
@@ -163,6 +192,66 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
   <div class="idea">Остаток, который вы считали на этапе A, — это вектор антиградиента функции потерь по предсказаниям. Производная не исчезла: для квадратичной потери она «схлопывается» в вычитание.</div>
   <p class="sub" style="margin-top:12px">Непонятно слово или формула? Выделите фрагмент и нажмите «Спросить ИИ» (Alt+I).</p>
 </header>
+
+<!-- SIMPLE -->
+<section class="card simple" id="simple">
+  <div class="sec-head"><div class="badge">0</div><div><h2>Совсем просто: семь маленьких шагов</h2><p class="sub">Без формул. Только одна квартира, один вопрос и кнопки. Дальше по уроку всё то же самое — уже со знаками ∂.</p></div></div>
+
+  <div class="ss"><div class="n">1</div><div>
+    <h3>Производная — это ответ на один вопрос</h3>
+    <p>«Если я <b>чуть-чуть</b> сдвину число, ошибка пойдёт вверх или вниз — и насколько круто?» Вот и всё. Производная — это направление и крутизна. Ничего больше.</p>
+  </div></div>
+
+  <div class="ss"><div class="n">2</div><div>
+    <h3>Пошевелим предсказание для квартиры A</h3>
+    <p>Настоящая цена квартиры A — <b id="sA_y"></b>. Мы предсказали <b id="sA_F"></b>. Ошибка в квадрате: <span class="mono" id="sA_L0"></span>. Теперь нажмите кнопку и посмотрите, что станет с ошибкой.</p>
+    <div class="poke">
+      <div class="sub">Сдвинуть предсказание для A на:</div>
+      <div class="btns" id="pokeBtns"><button data-d="-100">−100</button><button data-d="-10">−10</button><button data-d="-1">−1</button><button data-d="1">+1</button><button data-d="10">+10</button><button data-d="100">+100</button></div>
+      <div class="out">
+        <div class="box"><div class="lbl">Было предсказание</div><div class="val" id="pk_F0"></div></div>
+        <div class="box"><div class="lbl">Стало предсказание</div><div class="val" id="pk_F1"></div></div>
+        <div class="box"><div class="lbl">Была ошибка</div><div class="val" id="pk_L0"></div></div>
+        <div class="box"><div class="lbl">Стала ошибка</div><div class="val" id="pk_L1"></div></div>
+      </div>
+      <div class="verdict" id="pk_v"></div>
+      <p class="sub" id="pk_rate" style="margin-top:8px"></p>
+    </div>
+    <p>Понажимайте +1 и −1. В одну сторону ошибка растёт, в другую падает. <b>Число «на сколько растёт при сдвиге на единичку» — это и есть производная.</b> Её точное значение здесь: <span class="mono" id="sA_d"></span>. Знак говорит «куда плохо», величина — «насколько круто».</p>
+  </div></div>
+
+  <div class="ss"><div class="n">3</div><div>
+    <h3>Почему «частная»</h3>
+    <p>Квартир четыре, у каждой своё предсказание. Я шевелил <b>только A</b>, остальные три не трогал — они «заморожены». Производная «по одному числу за раз, остальные стоят» называется <b>частной</b>. Страшное слово, простой смысл: по одной штуке.</p>
+    <div class="four" id="fourBox"></div>
+  </div></div>
+
+  <div class="ss"><div class="n">4</div><div>
+    <h3>Градиент — просто столбик из четырёх таких чисел</h3>
+    <p>Тот же вопрос задаём для B, C и D. Получаем четыре ответа и записываем столбиком. Этот столбик и есть <b>градиент</b>. Он говорит: «вот у кого и насколько ошибка растёт, если предсказание увеличить».</p>
+    <div id="gradCol"></div>
+  </div></div>
+
+  <div class="ss"><div class="n">5</div><div>
+    <h3>Градиентный спуск — иди против</h3>
+    <p>Правило из одного слова: <b>наоборот</b>. Если для A ошибка растёт, когда предсказание увеличиваешь, — уменьшай. Если для D растёт, когда уменьшаешь, — увеличивай. Шагать против градиента = «градиентный спуск». Спуск — потому что ошибка каждый раз становится меньше, мы спускаемся по ней вниз.</p>
+    <div class="one" id="simpleRule"></div>
+  </div></div>
+
+  <div class="ss"><div class="n">6</div><div>
+    <h3>Где это в вашей тетради</h3>
+    <p id="simpleResid"></p>
+    <p>Остаток — это та же производная, только <b>с обратным знаком</b> и <b>без двойки</b>. Минус — потому что «иди против». Двойка пропадает, потому что в формуле потерь стоит ½, и она её съедает (это видно в шаге 2 ниже). Когда вы на этапе A вычитали «цена минус предсказание», вы брали производную и переворачивали знак. Просто не знали, что это так называется.</p>
+  </div></div>
+
+  <div class="ss"><div class="n">7</div><div>
+    <h3>Почему бустинг не идёт по градиенту напрямую</h3>
+    <p id="simpleWhy"></p>
+    <p>Но мы не можем запомнить ответ для каждой квартиры отдельно: новую квартиру мы ещё не видели. Поэтому дерево говорит <b>грубее, группами</b>: «все из этого района — на столько-то, все из того — на столько-то». Это тот же спуск, только округлённый до групп. А ν говорит, какую долю от шага сделать.</p>
+    <div class="one">Остаток = «куда и насколько сдвинуть предсказание, чтобы ошибка упала». Это производная с обратным знаком. Дерево округляет её до групп, ν делает шаг короче. Вот и весь «градиентный» в градиентном бустинге.</div>
+  </div></div>
+  <p class="sub">Дальше — то же самое ещё раз, но уже с формулами: там видно, откуда берётся «без двойки» и как это записывают математики.</p>
+</section>
 
 <!-- GD -->
 <section class="card" id="gd">
@@ -335,12 +424,47 @@ body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
     // step
     document.getElementById("stepRows").innerHTML=names.map(function(n,i){ var a=F-LR*grad[i], b=F+LR*h[i]; return "<tr>"+td(n,"k")+td(f2(F)+" − "+LR+"·"+sg(grad[i])+" = "+f2(a))+td(f2(F)+" + "+LR+"·"+sg(h[i])+" = "+f2(b),"res")+td(f2(b-a),cls(b-a))+"</tr>"; }).join("");
     document.getElementById("stepNote").innerHTML="Разница — цена за обобщение: честный спуск двигает каждую квартиру ровно по её градиенту, но для пятой квартиры градиента нет. Дерево двигает <b>группами</b> (по «"+best+"»), чуть грубее, зато умеет предсказать любой объект по его признакам. При ν = "+LR+" оба шага прошли долю "+LR+" пути.";
+    // simple section
+    renderSimple(F, grad, anti);
     // charts
     drawLoss(F); drawGrad(anti);
     // losses section
     renderLosses(F);
     renderMath(document.querySelector("main"));
   }
+
+  var POKE=0;
+  function fmtL(v){ return Math.round(v).toLocaleString("ru-RU"); }
+  function renderSimple(F, grad, anti){
+    var yA=y[0], L0=Math.pow(yA-F,2), d=2*(F-yA);
+    document.getElementById("sA_y").textContent=yA; document.getElementById("sA_F").textContent=f2(F);
+    document.getElementById("sA_L0").textContent="("+yA+" − "+f2(F)+")² = "+fmtL(L0);
+    document.getElementById("sA_d").textContent="2·("+f2(F)+" − "+yA+") = "+f2(d);
+    renderPoke(F);
+    // four boxes
+    document.getElementById("fourBox").innerHTML=names.map(function(n,i){ return "<div class='f"+(i===0?" live":"")+"'><b>"+n+"</b><span>"+f2(F)+"</span><small>"+(i===0?"шевелим":"заморожено")+"</small></div>"; }).join("");
+    // gradient column (without ½ -> full 2(F-y) to match poke) — show both
+    var col="<div class='colvec'>"+names.map(function(n,i){ return "<div><span class='lbl'>"+n+"</span><span>"+f2(2*(F-y[i]))+"</span></div>"; }).join("")+"</div>";
+    document.getElementById("gradCol").innerHTML=col+"<span class='sub'>для ошибки (y − F)². Знак «+» — при увеличении предсказания ошибка растёт; «−» — падает.</span>";
+    // rule
+    var up=names.filter(function(n,i){return F<y[i];}), dn=names.filter(function(n,i){return F>y[i];});
+    document.getElementById("simpleRule").innerHTML=(dn.length?"Для "+dn.join(", ")+" предсказание завышено → двигаем <b>вниз</b>. ":"")+(up.length?"Для "+up.join(", ")+" занижено → двигаем <b>вверх</b>.":"")+(!up.length&&!dn.length?"Все предсказания точные — двигать нечего.":"");
+    // resid
+    var rA=yA-F;
+    document.getElementById("simpleResid").innerHTML="Посмотрите на остаток для A в тетради: "+yA+" − "+f2(F)+" = <b>"+f2(rA)+"</b>. А производная была <b>"+f2(d)+"</b> (это 2·"+f2(Math.abs(rA))+(rA<0?"":", со знаком минус")+").";
+    document.getElementById("simpleWhy").innerHTML="Честный градиентный спуск сказал бы каждой квартире своё: "+names.map(function(n,i){ var a=anti[i]; return n+" — "+(a<0?"вниз":a>0?"вверх":"стоять")+" на "+f2(Math.abs(a)); }).join(", ")+".";
+  }
+  function renderPoke(F){
+    var yA=y[0], F1=F+POKE, L0=Math.pow(yA-F,2), L1=Math.pow(yA-F1,2), v=document.getElementById("pk_v");
+    document.getElementById("pk_F0").textContent=f2(F); document.getElementById("pk_F1").textContent=f2(F1);
+    document.getElementById("pk_L0").textContent=fmtL(L0); document.getElementById("pk_L1").textContent=fmtL(L1);
+    if(POKE===0){ v.className="verdict zero"; v.textContent="Нажмите кнопку — сдвиньте предсказание."; document.getElementById("pk_rate").textContent=""; return; }
+    var diff=L1-L0;
+    v.className="verdict "+(diff>0?"up":diff<0?"down":"zero");
+    v.textContent=(diff>0?"Ошибка ВЫРОСЛА на "+fmtL(diff):diff<0?"Ошибка УПАЛА на "+fmtL(-diff):"Ошибка не изменилась")+" (сдвиг "+(POKE>0?"+":"")+POKE+")";
+    document.getElementById("pk_rate").textContent="На одну единицу сдвига: "+f2(Math.round(diff/POKE*100)/100)+" — почти ровно производная "+f2(2*(F-yA))+(Math.abs(POKE)>1?" (чем меньше сдвиг, тем точнее совпадение)":"")+".";
+  }
+  [].forEach.call(document.querySelectorAll("#pokeBtns button"),function(b){ b.addEventListener("click",function(){ POKE=Number(b.dataset.d); renderPoke(Number(document.getElementById("Fcur").value)||0); }); });
 
   function svgEl(id,w,h){ var s=document.getElementById(id); s.setAttribute("viewBox","0 0 "+w+" "+h); s.innerHTML=""; return s; }
   function lin(d0,d1,r0,r1){ return function(v){ return r0+(v-d0)/(d1-d0||1)*(r1-r0); }; }
