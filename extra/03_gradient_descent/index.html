@@ -158,6 +158,23 @@ main .colvec{display:inline-grid;gap:4px;padding:8px 14px;border-left:2px solid 
 main .colvec div{display:grid;grid-template-columns:28px 80px;gap:8px}
 main .colvec .lbl{color:var(--muted);font-weight:500}
 @media(max-width:600px){main .four{grid-template-columns:repeat(2,1fr)}}
+main .ss .n.sub{background:var(--paper-2);color:var(--muted);font-size:13px}
+main .hill{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,40%);gap:14px;align-items:center;margin:10px 0}
+@media(max-width:700px){main .hill{grid-template-columns:1fr}}
+main .mini{width:100%;border-collapse:separate;border-spacing:0;font-size:14.5px}
+main .mini td,main .mini th{padding:7px 10px;border-bottom:1px solid var(--line-2);text-align:right;font-variant-numeric:tabular-nums}
+main .mini th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em}
+main .mini td:first-child,main .mini th:first-child{text-align:left}
+main .mini tr.now td{background:var(--amber-soft);font-weight:700}
+main .mini tr.goal td{color:var(--green);font-weight:700}
+main .why{font-size:13.5px;color:var(--muted);text-align:left!important;max-width:360px}
+main .desc .btns{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+main .desc .btns button{font:inherit;font-weight:700;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+main .desc .btns button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+main .gloss{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:10px 0}
+main .gloss div{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
+main .gloss b{display:block;color:var(--accent-ink);margin-bottom:3px}
+main .gloss small{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -195,18 +212,39 @@ main .colvec .lbl{color:var(--muted);font-weight:500}
 
 <!-- SIMPLE -->
 <section class="card simple" id="simple">
-  <div class="sec-head"><div class="badge">0</div><div><h2>Совсем просто: семь маленьких шагов</h2><p class="sub">Без формул. Только одна квартира, один вопрос и кнопки. Дальше по уроку всё то же самое — уже со знаками ∂.</p></div></div>
+  <div class="sec-head"><div class="badge">0</div><div><h2>Совсем просто: от холма до тетради</h2><p class="sub">Без формул. Одна квартира, один вопрос, кнопки. Каждый шаг — ответ на вопрос «а почему?». Дальше по уроку — всё то же самое, уже со знаками ∂.</p></div></div>
 
+  <!-- 1 -->
   <div class="ss"><div class="n">1</div><div>
-    <h3>Производная — это ответ на один вопрос</h3>
-    <p>«Если я <b>чуть-чуть</b> сдвину число, ошибка пойдёт вверх или вниз — и насколько круто?» Вот и всё. Производная — это направление и крутизна. Ничего больше.</p>
+    <h3>Картинка в голове: холм в тумане</h3>
+    <div class="hill">
+      <div>
+        <p>Вы стоите на склоне холма в густом тумане. Вершин и низин не видно — виден только метр земли под ногами. Задача: спуститься в самую низкую точку.</p>
+        <p>Как? <b>Ногой пробуете, в какую сторону земля идёт вниз, и делаете шаг туда.</b> Потом снова пробуете. Снова шаг. Пока земля под ногами не станет ровной.</p>
+        <p>Это и есть градиентный спуск — целиком. Три вещи: <b>где стою</b> (число), <b>куда земля идёт вниз</b> (производная), <b>какой длины шаг</b> (learning rate ν).</p>
+      </div>
+      <div><svg class="chart" id="chHill"></svg></div>
+    </div>
+    <div class="one">Холм — это ошибка. Низина — где ошибка меньше всего. Мы «стоим» на нашем предсказании.</div>
   </div></div>
 
+  <!-- 2 -->
   <div class="ss"><div class="n">2</div><div>
-    <h3>Пошевелим предсказание для квартиры A</h3>
-    <p>Настоящая цена квартиры A — <b id="sA_y"></b>. Мы предсказали <b id="sA_F"></b>. Ошибка в квадрате: <span class="mono" id="sA_L0"></span>. Теперь нажмите кнопку и посмотрите, что станет с ошибкой.</p>
+    <h3>Что здесь «холм»: ошибка одной квартиры</h3>
+    <p>Квартира A стоит <b id="s2_y"></b>. Мы предсказали <b id="s2_F"></b>. Насколько промахнулись?</p>
+    <table class="mini"><thead><tr><th>Что считаем</th><th>Число</th><th class="why">Почему так</th></tr></thead><tbody id="s2_rows"></tbody></table>
+    <p><b>Почему квадрат, а не просто разница?</b> Две причины, обе простые. Во-первых, разница бывает с минусом (−600), а «промах» не бывает отрицательным — квадрат убирает знак. Во-вторых, квадрат сильнее наказывает большие промахи: промах 600 даёт 360 000, промах 60 — всего 3 600, в сто раз меньше. Так модель больше всего старается исправить самые грубые ошибки.</p>
+    <p>Эта ошибка зависит от одного числа — нашего предсказания. Меняем предсказание — меняется ошибка. Вот это «ошибка как функция от предсказания» и есть холм. Мы стоим на нём в точке <b id="s2_F2"></b>.</p>
+  </div></div>
+
+  <!-- 3 -->
+  <div class="ss"><div class="n">3</div><div>
+    <h3>Пробуем ногой: шевелим предсказание</h3>
+    <p>Тумана у нас нет — мы можем посчитать ошибку в соседних точках и посмотреть. Вот ошибка, если предсказание чуть меньше и чуть больше:</p>
+    <table class="mini"><thead><tr><th>Предсказание</th><th>Разница</th><th>Ошибка (квадрат)</th><th>Изменение ошибки</th></tr></thead><tbody id="s3_rows"></tbody></table>
+    <p>Видите закономерность? Шаг на +1 увеличивает ошибку примерно на одно и то же число; шаг на −1 — уменьшает примерно на столько же. <b>Это число — «на сколько меняется ошибка при сдвиге на единичку» — и есть производная.</b></p>
     <div class="poke">
-      <div class="sub">Сдвинуть предсказание для A на:</div>
+      <div class="sub">Сдвиньте предсказание для A сами и посмотрите:</div>
       <div class="btns" id="pokeBtns"><button data-d="-100">−100</button><button data-d="-10">−10</button><button data-d="-1">−1</button><button data-d="1">+1</button><button data-d="10">+10</button><button data-d="100">+100</button></div>
       <div class="out">
         <div class="box"><div class="lbl">Было предсказание</div><div class="val" id="pk_F0"></div></div>
@@ -217,40 +255,77 @@ main .colvec .lbl{color:var(--muted);font-weight:500}
       <div class="verdict" id="pk_v"></div>
       <p class="sub" id="pk_rate" style="margin-top:8px"></p>
     </div>
-    <p>Понажимайте +1 и −1. В одну сторону ошибка растёт, в другую падает. <b>Число «на сколько растёт при сдвиге на единичку» — это и есть производная.</b> Её точное значение здесь: <span class="mono" id="sA_d"></span>. Знак говорит «куда плохо», величина — «насколько круто».</p>
+    <p>Точное значение производной здесь: <span class="mono" id="s3_d"></span>. Откуда формула «2 × разница» — в шаге 2 основной части; сейчас важно только: <b>знак говорит, куда ошибка растёт; величина — насколько круто</b>.</p>
+    <div class="callout amber" id="s3_sign"></div>
   </div></div>
 
-  <div class="ss"><div class="n">3</div><div>
-    <h3>Почему «частная»</h3>
-    <p>Квартир четыре, у каждой своё предсказание. Я шевелил <b>только A</b>, остальные три не трогал — они «заморожены». Производная «по одному числу за раз, остальные стоят» называется <b>частной</b>. Страшное слово, простой смысл: по одной штуке.</p>
-    <div class="four" id="fourBox"></div>
-  </div></div>
-
+  <!-- 4 -->
   <div class="ss"><div class="n">4</div><div>
-    <h3>Градиент — просто столбик из четырёх таких чисел</h3>
-    <p>Тот же вопрос задаём для B, C и D. Получаем четыре ответа и записываем столбиком. Этот столбик и есть <b>градиент</b>. Он говорит: «вот у кого и насколько ошибка растёт, если предсказание увеличить».</p>
-    <div id="gradCol"></div>
+    <h3>Делаем шаги вниз — сам градиентный спуск, целиком</h3>
+    <p>Правило из одного слова: <b>наоборот</b>. Ошибка растёт при сдвиге вверх — значит, идём вниз. И не на всю производную (она огромная — 1200), а на её долю: <b>шаг = ν × производная</b>. Нажимайте «Шаг» и смотрите, как предсказание сползает к настоящей цене, а ошибка — к нулю.</p>
+    <div class="desc">
+      <div class="btns"><span class="sub">ν =</span><div class="seg" id="descSeg"><button data-v="0.1">0.1</button><button data-v="0.25" class="on">0.25</button><button data-v="0.4">0.4</button><button data-v="0.5">0.5</button></div><button class="primary" id="descStep">Шаг ↓</button><button id="descAll">10 шагов</button><button id="descReset">Сначала</button></div>
+      <div class="charts2">
+        <div><svg class="chart" id="chDesc"></svg></div>
+        <div class="tbl"><table class="mini"><thead><tr><th>Шаг</th><th>Стою на</th><th>Ошибка</th><th>Производная</th><th>Шаг = −ν·произв.</th><th>Перехожу на</th></tr></thead><tbody id="descRows"></tbody></table></div>
+      </div>
+      <div class="callout" id="descNote"></div>
+    </div>
+    <p>Вот и всё. Каждая строка таблицы — одно и то же действие: <b>посмотрел на производную → шагнул против неё</b>. Градиентный спуск — это не формула, это <i>повторение</i> этого действия.</p>
+    <details class="deeper"><summary>Почему при ν = 0.5 попадаем точно за один шаг, а в тетради при ν = 0.5 — только полпути?</summary><div class="deeper-body"><p>Здесь ошибка — целый квадрат $(y-F)^2$, и её производная $2(F-y)$ содержит двойку. В тетради (и во всей основной части урока) ошибку считают с половинкой, $\tfrac12(y-F)^2$, чтобы двойка исчезла: производная становится $F-y$, ровно «минус остаток». Тогда ν = 0.5 означает «полпути». Смысл одинаковый, разница — только в том, куда спрятали двойку: в производную или в ν.</p></div></details>
   </div></div>
 
+  <!-- 5 -->
   <div class="ss"><div class="n">5</div><div>
-    <h3>Градиентный спуск — иди против</h3>
-    <p>Правило из одного слова: <b>наоборот</b>. Если для A ошибка растёт, когда предсказание увеличиваешь, — уменьшай. Если для D растёт, когда уменьшаешь, — увеличивай. Шагать против градиента = «градиентный спуск». Спуск — потому что ошибка каждый раз становится меньше, мы спускаемся по ней вниз.</p>
+    <h3>Квартир четыре: «частная» производная</h3>
+    <p>У нас не одна квартира, а четыре, и у каждой своё предсказание. Четыре числа, которые можно двигать. Общая ошибка — сумма четырёх ошибок.</p>
+    <p>В шаге 3 я шевелил <b>только A</b>, а B, C, D держал на месте — «заморозил». Производная «по одному числу, остальные стоят» называется <b>частной</b>. Страшное слово, простой смысл: <i>по одной штуке за раз</i>. Знак ∂ (круглое «д») вместо обычного d — просто пометка «тут несколько переменных, шевелю одну».</p>
+    <div class="four" id="fourBox"></div>
+    <p>Почему можно по одной? Потому что ошибка квартиры B вообще не зависит от предсказания A: сдвинул A — ошибка B не шелохнулась. Поэтому «производная всей ошибки по A» равна «производной ошибки A по A». Остальные три слагаемых дают ноль.</p>
+  </div></div>
+
+  <!-- 6 -->
+  <div class="ss"><div class="n">6</div><div>
+    <h3>Градиент — столбик из четырёх ответов</h3>
+    <p>Задаём тот же вопрос («сдвину вверх на единичку — ошибка вырастет или упадёт?») для A, B, C и D. Четыре ответа записываем столбиком. Этот столбик и есть <b>градиент</b>. Обозначают его ∇L («набла»). Ничего нового в нём нет — это четыре производные из шага 3, по одной на квартиру.</p>
+    <div id="gradCol"></div>
+    <p>А «иди против» для четырёх чисел сразу — значит перевернуть знак у каждого. Перевёрнутый столбик называется <b>антиградиент</b>: он показывает уже не «куда плохо», а <b>«куда хорошо»</b>.</p>
     <div class="one" id="simpleRule"></div>
   </div></div>
 
-  <div class="ss"><div class="n">6</div><div>
-    <h3>Где это в вашей тетради</h3>
+  <!-- 7 -->
+  <div class="ss"><div class="n">7</div><div>
+    <h3>Где всё это в вашей тетради</h3>
     <p id="simpleResid"></p>
-    <p>Остаток — это та же производная, только <b>с обратным знаком</b> и <b>без двойки</b>. Минус — потому что «иди против». Двойка пропадает, потому что в формуле потерь стоит ½, и она её съедает (это видно в шаге 2 ниже). Когда вы на этапе A вычитали «цена минус предсказание», вы брали производную и переворачивали знак. Просто не знали, что это так называется.</p>
+    <table class="mini"><thead><tr><th>Квартира</th><th>Остаток в тетради (этап A)</th><th>Производная</th><th>Антиградиент (половинный)</th><th>Совпало?</th></tr></thead><tbody id="s7_rows"></tbody></table>
+    <p>Остаток — это производная <b>с обратным знаком</b> и <b>без двойки</b>. Минус — потому что «иди против» (антиградиент). Двойки нет — потому что ошибку в тетради считают с ½, и она съедает двойку (см. «Глубже» в шаге 4). Когда вы на этапе A писали «цена минус предсказание», вы брали производную и переворачивали знак. Просто не знали, что это так называется.</p>
+    <p>А этап D — «старое предсказание + ν × поправка» — это ровно строка «перехожу на» из таблицы шага 4: шаг против производной, укороченный в ν раз. Этап A — производная, этап D — шаг. Между ними — этапы B и C, о них следующий пункт.</p>
   </div></div>
 
-  <div class="ss"><div class="n">7</div><div>
-    <h3>Почему бустинг не идёт по градиенту напрямую</h3>
+  <!-- 8 -->
+  <div class="ss"><div class="n">8</div><div>
+    <h3>Зачем между ними дерево: шаги группами</h3>
     <p id="simpleWhy"></p>
-    <p>Но мы не можем запомнить ответ для каждой квартиры отдельно: новую квартиру мы ещё не видели. Поэтому дерево говорит <b>грубее, группами</b>: «все из этого района — на столько-то, все из того — на столько-то». Это тот же спуск, только округлённый до групп. А ν говорит, какую долю от шага сделать.</p>
-    <div class="one">Остаток = «куда и насколько сдвинуть предсказание, чтобы ошибка упала». Это производная с обратным знаком. Дерево округляет её до групп, ν делает шаг короче. Вот и весь «градиентный» в градиентном бустинге.</div>
+    <p>Но мы не можем запомнить «свой ответ» для каждой квартиры: завтра придёт пятая квартира, которой в таблице не было, — что ей прибавлять? Поэтому дерево (этапы B и C) говорит <b>грубее, группами</b>: «всем из этого района — на столько-то, всем из того — на столько-то». Одно число на группу — <b>среднее</b> антиградиентов группы, потому что среднее ближе всего ко всем числам группы сразу.</p>
+    <table class="mini"><thead><tr><th>Квартира</th><th>Честный спуск: свой шаг каждому</th><th>Дерево: один шаг на группу</th><th>Потеря точности</th></tr></thead><tbody id="s8_rows"></tbody></table>
+    <p>Это тот же спуск, только <b>округлённый до групп</b>. Чуть грубее — зато пятой квартире уже есть что прибавить: по её району. А ν говорит, какую долю от этого шага сделать.</p>
+    <div class="one">Остаток = «куда и насколько сдвинуть предсказание, чтобы ошибка упала» = производная с обратным знаком. Дерево округляет её до групп. ν делает шаг короче. Повторяем 20 раз. Вот и весь «градиентный» в градиентном бустинге.</div>
   </div></div>
-  <p class="sub">Дальше — то же самое ещё раз, но уже с формулами: там видно, откуда берётся «без двойки» и как это записывают математики.</p>
+
+  <!-- 9 glossary -->
+  <div class="ss"><div class="n sub">A–Я</div><div>
+    <h3>Словарик: шесть слов простыми словами</h3>
+    <div class="gloss">
+      <div><b>Производная</b>«Сдвину на единичку — ошибка пойдёт вверх или вниз и насколько?» Одно число: знак = направление, величина = крутизна.<br><small>Обозначение: dL/dF или L′</small></div>
+      <div><b>Частная производная</b>То же самое, когда чисел несколько: шевелю одно, остальные заморожены.<br><small>Обозначение: ∂L/∂F<sub>A</sub></small></div>
+      <div><b>Градиент</b>Столбик из всех частных производных — по одной на каждое число. Показывает, «куда плохо».<br><small>Обозначение: ∇L</small></div>
+      <div><b>Антиградиент</b>Градиент с перевёрнутыми знаками. Показывает «куда хорошо». В тетради — остатки.<br><small>Обозначение: −∇L</small></div>
+      <div><b>Градиентный спуск</b>Повторять: посчитал градиент → шагнул против него на ν-долю. Ошибка каждый раз уменьшается.<br><small>F ← F − ν·∇L</small></div>
+      <div><b>Learning rate ν</b>Длина шага как доля от производной. Больше — быстрее, но можно перескочить; меньше — медленнее, но надёжнее.<br><small>В тетрадях 0.3–0.5</small></div>
+    </div>
+  </div></div>
+
+  <p class="sub">Дальше — то же самое ещё раз, но уже с формулами: там видно, откуда «2 × разница», куда девается двойка и как это записывают математики.</p>
 </section>
 
 <!-- GD -->
@@ -433,26 +508,37 @@ main .colvec .lbl{color:var(--muted);font-weight:500}
     renderMath(document.querySelector("main"));
   }
 
-  var POKE=0;
+  var POKE=0, DLR=0.25, DESC=[];
   function fmtL(v){ return Math.round(v).toLocaleString("ru-RU"); }
+  function sgn(v){ return (v>0?"+":"")+f2(v); }
   function renderSimple(F, grad, anti){
-    var yA=y[0], L0=Math.pow(yA-F,2), d=2*(F-yA);
-    document.getElementById("sA_y").textContent=yA; document.getElementById("sA_F").textContent=f2(F);
-    document.getElementById("sA_L0").textContent="("+yA+" − "+f2(F)+")² = "+fmtL(L0);
-    document.getElementById("sA_d").textContent="2·("+f2(F)+" − "+yA+") = "+f2(d);
+    var yA=y[0], L0=Math.pow(yA-F,2), d=2*(F-yA), rA=yA-F;
+    ["s2_F","s2_F2"].forEach(function(id){ document.getElementById(id).textContent=f2(F); });
+    document.getElementById("s2_y").textContent=yA;
+    document.getElementById("s2_rows").innerHTML=
+      "<tr><td>Настоящая цена</td><td>"+yA+"</td><td class='why'>то, что хотим угадать</td></tr>"+
+      "<tr><td>Предсказание</td><td>"+f2(F)+"</td><td class='why'>то, что можем двигать</td></tr>"+
+      "<tr><td>Разница (цена − предсказание)</td><td>"+f2(rA)+"</td><td class='why'>"+(rA<0?"минус: мы завысили":rA>0?"плюс: мы занизили":"ноль: попали")+"</td></tr>"+
+      "<tr class='now'><td>Ошибка = разница²</td><td>"+fmtL(L0)+"</td><td class='why'>("+f2(rA)+")² — без знака, большие промахи наказаны сильнее</td></tr>";
+    var rows="", prev=null;
+    [-10,-1,0,1,10].forEach(function(dd){ var Fx=F+dd, Lx=Math.pow(yA-Fx,2); rows+="<tr"+(dd===0?" class='now'":"")+"><td>"+f2(Fx)+(dd===0?" (сейчас)":dd>0?" (+"+dd+")":" ("+dd+")")+"</td><td>"+f2(yA-Fx)+"</td><td>"+fmtL(Lx)+"</td><td>"+(dd===0?"—":sgn(Lx-L0)+(Math.abs(dd)===1?" за 1":" за "+Math.abs(dd)+" → "+f2(Math.round((Lx-L0)/Math.abs(dd)*10)/10)+" за 1"))+"</td></tr>"; });
+    document.getElementById("s3_rows").innerHTML=rows;
+    document.getElementById("s3_d").textContent="2 × ("+f2(F)+" − "+yA+") = "+f2(d);
+    document.getElementById("s3_sign").innerHTML= d>0 ? "Производная <b>положительная</b> ("+f2(d)+"): если предсказание увеличить, ошибка вырастет. Земля идёт вверх. Значит, вниз — это <b>уменьшать</b> предсказание." : d<0 ? "Производная <b>отрицательная</b> ("+f2(d)+"): если предсказание увеличить, ошибка упадёт. Земля идёт вниз. Значит, надо <b>увеличивать</b> предсказание." : "Производная <b>ноль</b>: земля ровная, мы в низине — предсказание уже точное.";
     renderPoke(F);
-    // four boxes
+    descReset(); 
     document.getElementById("fourBox").innerHTML=names.map(function(n,i){ return "<div class='f"+(i===0?" live":"")+"'><b>"+n+"</b><span>"+f2(F)+"</span><small>"+(i===0?"шевелим":"заморожено")+"</small></div>"; }).join("");
-    // gradient column (without ½ -> full 2(F-y) to match poke) — show both
-    var col="<div class='colvec'>"+names.map(function(n,i){ return "<div><span class='lbl'>"+n+"</span><span>"+f2(2*(F-y[i]))+"</span></div>"; }).join("")+"</div>";
-    document.getElementById("gradCol").innerHTML=col+"<span class='sub'>для ошибки (y − F)². Знак «+» — при увеличении предсказания ошибка растёт; «−» — падает.</span>";
-    // rule
+    var col="<div class='colvec'>"+names.map(function(n,i){ return "<div><span class='lbl'>"+n+"</span><span>"+sgn(2*(F-y[i]))+"</span></div>"; }).join("")+"</div>";
+    var acol="<div class='colvec' style='border-color:var(--green)'>"+names.map(function(n,i){ return "<div><span class='lbl'>"+n+"</span><span>"+sgn(-2*(F-y[i]))+"</span></div>"; }).join("")+"</div>";
+    document.getElementById("gradCol").innerHTML="<p style='margin:4px 0'><span class='sub'>градиент ∇L («куда плохо»)</span><br>"+col+"<span class='sub'>знак «+» — при увеличении предсказания ошибка растёт; «−» — падает</span></p><p style='margin:4px 0'><span class='sub'>антиградиент −∇L («куда хорошо»)</span><br>"+acol+"<span class='sub'>те же числа с перевёрнутым знаком</span></p>";
     var up=names.filter(function(n,i){return F<y[i];}), dn=names.filter(function(n,i){return F>y[i];});
     document.getElementById("simpleRule").innerHTML=(dn.length?"Для "+dn.join(", ")+" предсказание завышено → двигаем <b>вниз</b>. ":"")+(up.length?"Для "+up.join(", ")+" занижено → двигаем <b>вверх</b>.":"")+(!up.length&&!dn.length?"Все предсказания точные — двигать нечего.":"");
-    // resid
-    var rA=yA-F;
-    document.getElementById("simpleResid").innerHTML="Посмотрите на остаток для A в тетради: "+yA+" − "+f2(F)+" = <b>"+f2(rA)+"</b>. А производная была <b>"+f2(d)+"</b> (это 2·"+f2(Math.abs(rA))+(rA<0?"":", со знаком минус")+").";
+    document.getElementById("simpleResid").innerHTML="Откройте тетрадь, этап A, квартира A: остаток "+yA+" − "+f2(F)+" = <b>"+f2(rA)+"</b>. А производная из шага 3 была <b>"+sgn(d)+"</b>. Сравните все четыре:";
+    document.getElementById("s7_rows").innerHTML=names.map(function(n,i){ var r=y[i]-F, dd=2*(F-y[i]); return "<tr><td>"+n+"</td><td>"+f2(r)+"</td><td>"+sgn(dd)+"</td><td>"+sgn(-dd/2)+"</td><td style='color:var(--green);font-weight:700'>✓</td></tr>"; }).join("");
     document.getElementById("simpleWhy").innerHTML="Честный градиентный спуск сказал бы каждой квартире своё: "+names.map(function(n,i){ var a=anti[i]; return n+" — "+(a<0?"вниз":a>0?"вверх":"стоять")+" на "+f2(Math.abs(a)); }).join(", ")+".";
+    var gR=[(anti[0]+anti[1])/2,(anti[2]+anti[3])/2], hR=[gR[0],gR[0],gR[1],gR[1]];
+    document.getElementById("s8_rows").innerHTML=names.map(function(n,i){ return "<tr><td>"+n+" ("+rayon[i]+")</td><td>"+sgn(anti[i])+"</td><td>"+sgn(hR[i])+" (среднее по «"+rayon[i]+"»)</td><td>"+f2(Math.abs(anti[i]-hR[i]))+"</td></tr>"; }).join("");
+    drawHill();
   }
   function renderPoke(F){
     var yA=y[0], F1=F+POKE, L0=Math.pow(yA-F,2), L1=Math.pow(yA-F1,2), v=document.getElementById("pk_v");
@@ -465,6 +551,48 @@ main .colvec .lbl{color:var(--muted);font-weight:500}
     document.getElementById("pk_rate").textContent="На одну единицу сдвига: "+f2(Math.round(diff/POKE*100)/100)+" — почти ровно производная "+f2(2*(F-yA))+(Math.abs(POKE)>1?" (чем меньше сдвиг, тем точнее совпадение)":"")+".";
   }
   [].forEach.call(document.querySelectorAll("#pokeBtns button"),function(b){ b.addEventListener("click",function(){ POKE=Number(b.dataset.d); renderPoke(Number(document.getElementById("Fcur").value)||0); }); });
+
+  // ---- descent simulator (one apartment) ----
+  function descReset(){ var F=Number(document.getElementById("Fcur").value)||0; DESC=[F]; renderDesc(); }
+  function descStep(){ var yA=y[0], F=DESC[DESC.length-1], d=2*(F-yA); if(DESC.length>30) return; DESC.push(F-DLR*d); renderDesc(); }
+  function renderDesc(){
+    var yA=y[0], rows="";
+    DESC.forEach(function(F,k){ var d=2*(F-yA), st=-DLR*d, nx=F+st, L=Math.pow(yA-F,2); var last=k===DESC.length-1;
+      rows+="<tr"+(last?" class='now'":"")+"><td>"+k+"</td><td>"+f2(Math.round(F*100)/100)+"</td><td>"+fmtL(L)+"</td><td>"+sgn(Math.round(d*100)/100)+"</td><td>"+(last?"—":sgn(Math.round(st*100)/100))+"</td><td>"+(last?"—":f2(Math.round(nx*100)/100))+"</td></tr>"; });
+    document.getElementById("descRows").innerHTML=rows;
+    var F=DESC[DESC.length-1], k=DESC.length-1, L=Math.pow(yA-F,2), L0=Math.pow(yA-DESC[0],2);
+    document.getElementById("descNote").innerHTML= k===0 ? "Стоим на "+f2(F)+", ошибка "+fmtL(L0)+". Производная "+sgn(2*(F-yA))+" → пойдём "+(F>yA?"вниз":F<yA?"вверх":"никуда")+". Нажмите «Шаг ↓»."
+      : "После "+k+" шаг"+(k===1?"а":k<5?"ов":"ов")+": стоим на <b>"+f2(Math.round(F*100)/100)+"</b> (цель "+yA+"), ошибка <b>"+fmtL(L)+"</b> — это "+f2(Math.round(L/L0*1000)/10)+" % от стартовой. "+(Math.abs(F-yA)<0.5?"Мы в низине: земля ровная, производная ≈ 0, шаги больше ничего не меняют.":"Каждый шаг — всё та же доля ν от оставшегося расстояния: ошибка тает, но никогда не перепрыгивает цель (при ν ≤ 0.5).");
+    drawDesc();
+  }
+  function drawDesc(){
+    var W=560,H=300,P={l:52,r:16,t:28,b:34}, s=svgEl("chDesc",W,H), yA=y[0], F0=DESC[0];
+    var span=Math.max(Math.abs(F0-yA)*1.3,100), lo=yA-span, hi=yA+span;
+    var pts=[]; for(var x=lo;x<=hi;x+=(hi-lo)/120) pts.push([x,Math.pow(yA-x,2)]);
+    var mx=Math.max.apply(null,pts.map(function(p){return p[1];}));
+    var sx=lin(lo,hi,P.l,W-P.r), sy=lin(0,mx*1.05,H-P.b,P.t);
+    s.insertAdjacentHTML("beforeend","<text class='ttl' x='"+P.l+"' y='16'>Холм ошибки квартиры A — и наши шаги вниз</text><line class='axis' x1='"+P.l+"' y1='"+(H-P.b)+"' x2='"+(W-P.r)+"' y2='"+(H-P.b)+"'/><line class='axis' x1='"+P.l+"' y1='"+P.t+"' x2='"+P.l+"' y2='"+(H-P.b)+"'/>");
+    s.insertAdjacentHTML("beforeend","<path d='"+pts.map(function(p,i){return (i?"L":"M")+sx(p[0]).toFixed(1)+" "+sy(p[1]).toFixed(1);}).join(" ")+"' fill='none' stroke='"+cssVar("--teal")+"' stroke-width='2.2'/>");
+    s.insertAdjacentHTML("beforeend","<line x1='"+sx(yA)+"' x2='"+sx(yA)+"' y1='"+P.t+"' y2='"+(H-P.b)+"' stroke='"+cssVar("--green")+"' stroke-dasharray='3 4'/><text x='"+(sx(yA)+6)+"' y='"+(P.t+12)+"' style='fill:"+cssVar("--green")+"'>низина: предсказание = цена</text>");
+    DESC.forEach(function(F,k){ var L=Math.pow(yA-F,2); if(k>0){ var Fp=DESC[k-1], Lp=Math.pow(yA-Fp,2); s.insertAdjacentHTML("beforeend","<line x1='"+sx(Fp)+"' y1='"+sy(Lp)+"' x2='"+sx(F)+"' y2='"+sy(L)+"' stroke='"+cssVar("--orange")+"' stroke-width='2'/>"); }
+      s.insertAdjacentHTML("beforeend","<circle cx='"+sx(F)+"' cy='"+sy(L)+"' r='"+(k===DESC.length-1?6:4)+"' fill='"+cssVar("--orange")+"' stroke='"+cssVar("--surface")+"' stroke-width='1.5'/>"+(k<4||k===DESC.length-1?"<text class='mono' x='"+(sx(F)+(F>yA?8:-8))+"' y='"+(sy(L)-8)+"' text-anchor='"+(F>yA?"start":"end")+"'>"+k+"</text>":"")); });
+    s.insertAdjacentHTML("beforeend","<text x='"+(W/2)+"' y='"+(H-6)+"' text-anchor='middle'>предсказание для A</text>");
+  }
+  function drawHill(){
+    var W=360,H=220, s=svgEl("chHill",W,H), yA=y[0], F=Number(document.getElementById("Fcur").value)||0;
+    var span=Math.max(Math.abs(F-yA)*1.3,100), lo=yA-span, hi=yA+span, sx=lin(lo,hi,20,W-20), sy=lin(0,Math.pow(span,2)*1.1,H-24,20);
+    var pts=[]; for(var x=lo;x<=hi;x+=(hi-lo)/80) pts.push([x,Math.pow(yA-x,2)]);
+    s.insertAdjacentHTML("beforeend","<path d='"+pts.map(function(p,i){return (i?"L":"M")+sx(p[0]).toFixed(1)+" "+sy(p[1]).toFixed(1);}).join(" ")+" L"+sx(hi)+" "+(H-24)+" L"+sx(lo)+" "+(H-24)+" Z' fill='"+cssVar("--teal-soft")+"' stroke='"+cssVar("--teal")+"' stroke-width='2'/>");
+    var L=Math.pow(yA-F,2);
+    s.insertAdjacentHTML("beforeend","<circle cx='"+sx(F)+"' cy='"+sy(L)+"' r='7' fill='"+cssVar("--orange")+"'/><text x='"+sx(F)+"' y='"+(sy(L)-12)+"' text-anchor='middle' style='font-weight:700'>вы</text>");
+    var dir=F>yA?-1:1, x2=sx(F+dir*span*0.3), y2=sy(Math.pow(yA-(F+dir*span*0.3),2));
+    s.insertAdjacentHTML("beforeend","<line x1='"+sx(F)+"' y1='"+sy(L)+"' x2='"+x2+"' y2='"+y2+"' stroke='"+cssVar("--orange")+"' stroke-width='2.5' stroke-dasharray='5 4'/><text x='"+x2+"' y='"+(y2+16)+"' text-anchor='middle' style='fill:"+cssVar("--orange")+";font-weight:700'>вниз</text>");
+    s.insertAdjacentHTML("beforeend","<text x='"+sx(yA)+"' y='"+(H-8)+"' text-anchor='middle' style='fill:"+cssVar("--green")+"'>низина</text>");
+  }
+  [].forEach.call(document.querySelectorAll("#descSeg button"),function(b){ b.addEventListener("click",function(){ DLR=Number(b.dataset.v); [].forEach.call(document.querySelectorAll("#descSeg button"),function(x){x.classList.toggle("on",x===b);}); descReset(); }); });
+  document.getElementById("descStep").addEventListener("click",descStep);
+  document.getElementById("descAll").addEventListener("click",function(){ for(var i=0;i<10;i++) descStep(); });
+  document.getElementById("descReset").addEventListener("click",descReset);
 
   function svgEl(id,w,h){ var s=document.getElementById(id); s.setAttribute("viewBox","0 0 "+w+" "+h); s.innerHTML=""; return s; }
   function lin(d0,d1,r0,r1){ return function(v){ return r0+(v-d0)/(d1-d0||1)*(r1-r0); }; }
