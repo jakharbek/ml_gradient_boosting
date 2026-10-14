@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="ru" data-lesson="extra_03">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Где спрятан градиентный спуск</title>
+<meta name="description" content="Дополнительный урок: градиент, частные производные и шаг спуска, которых не видно в ручном расчёте бустинга — на числах рабочей тетради.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="icon" href="../../shared/web/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../shared/web/css/assistant.css">
+<script>window.GBC_EXTRA_LESSON = {"id":"extra_03","number":"Доп. 03","title":"Где спрятан градиентный спуск","subtitle":"Частные производные, градиент и шаг спуска в ручном расчёте бустинга","summary":"Функция потерь как функция четырёх предсказаний; частная производная по каждому; градиент и антиградиент на числах тетради; почему остаток — это антиградиент; дерево как приближение градиента; шаг спуска = этап D. Переключение функции потерь показывает, когда дифференцирование перестаёт «схлопываться» в вычитание.","objectives":["выписать функцию потерь как функцию предсказаний","взять частные производные и собрать градиент на числах","увидеть, что остаток = антиградиент для квадратичной потери","отличить честный шаг спуска от шага по дереву","увидеть производную явно на абсолютной и логистической потере"]};</script>
+<script src="../../shared/web/js/boot.js" data-root="../../" data-page="extra"></script>
+<style>
+:root{
+  --bg:#f6f4ee; --paper:#ffffff; --paper-2:#faf8f3; --ink:#1b1f2a; --ink-2:#3b4252; --muted:#6b7280; --line:#e4dfd4; --line-2:#efebe2;
+  --navy:#1f3864; --teal:#2e75b6; --teal-soft:#e6eef8; --orange:#e07b2a; --orange-soft:#fbeedf;
+  --green:#1b7f4b; --green-soft:#e3f3e8; --amber:#b7791f; --amber-soft:#fdf2d8; --red:#c0392b; --red-soft:#fbe5e2;
+  --expl:#fbf7ee; --expl-line:#efe4c8; --radius:14px; --shadow:0 10px 30px rgba(27,31,42,.06);
+}
+:root[data-theme="dark"]{
+  --bg:#12151c; --paper:#1a1e28; --paper-2:#20252f; --ink:#eceff4; --ink-2:#c7cdd8; --muted:#97a0b0; --line:#2c3341; --line-2:#262c38;
+  --navy:#9db8e8; --teal:#6aa6e0; --teal-soft:#1c2b40; --orange:#f09a52; --orange-soft:#3a2816;
+  --green:#5ac98a; --green-soft:#17301f; --amber:#e3b25a; --amber-soft:#3a2d12; --red:#ef7a6d; --red-soft:#3a1c19;
+  --expl:#22262d; --expl-line:#3a3f49; --shadow:0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:72px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Manrope,system-ui,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;font-size:16px}
+a{color:var(--teal)}
+.katex{font-size:1.04em}
+.topwrap{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);height:var(--topbar-h)}
+.topbar{max-width:1180px;margin:0 auto;padding:0 16px;height:100%;display:flex;align-items:center;gap:14px}
+.topbar .crumbs{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .crumbs a{color:var(--muted);text-decoration:none}
+.topbar .spacer{flex:1}
+.btn{font:inherit;font-weight:700;font-size:13px;padding:7px 12px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;display:inline-flex;gap:6px;align-items:center;text-decoration:none}
+.btn:hover{border-color:var(--teal);color:var(--teal)}
+.layout{max-width:1180px;margin:0 auto;padding:0 16px 80px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:36px}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+aside.toc{position:sticky;top:72px;align-self:start;max-height:calc(100vh - 90px);overflow:auto;padding-top:28px}
+@media(max-width:900px){aside.toc{position:static;max-height:none;padding-top:14px}}
+.toc h4{margin:0 0 8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.toc a{display:block;padding:6px 10px;border-left:2px solid var(--line);color:var(--ink-2);text-decoration:none;font-size:13.5px;font-weight:600}
+.toc a:hover,.toc a.active{color:var(--teal);border-left-color:var(--teal)}
+@media(max-width:900px){.toc nav{display:flex;flex-wrap:wrap;gap:6px}.toc a{border:1px solid var(--line);border-radius:999px;padding:5px 11px}.toc h4{display:none}}
+main{min-width:0}
+header.hero{padding:40px 0 20px}
+.eyebrow{display:inline-block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);font-weight:800;margin-bottom:12px}
+h1{font-size:clamp(28px,4.6vw,44px);line-height:1.1;margin:0 0 14px;font-weight:800;letter-spacing:-.02em}
+.lead{font-size:17px;color:var(--ink-2);max-width:700px;margin:0}
+.idea{margin-top:22px;padding:16px 20px;border-left:4px solid var(--teal);background:var(--paper);border-radius:0 var(--radius) var(--radius) 0;box-shadow:var(--shadow);font-weight:700}
+main section.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:26px;margin:22px 0}
+@media(max-width:600px){main section.card{padding:18px 16px}}
+.sec-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:8px}
+.badge{flex:0 0 42px;height:42px;border-radius:11px;background:var(--navy);color:#fff;display:grid;place-items:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:17px}
+:root[data-theme="dark"] .badge{color:#0e1320}
+main h2{margin:3px 0 4px;font-size:23px;letter-spacing:-.01em}
+main h3{font-size:17px;margin:22px 0 8px}
+main .sub{color:var(--muted);margin:0;max-width:720px}
+main p{margin:10px 0}
+main .callout{margin:16px 0;padding:13px 16px;border-radius:10px;background:var(--teal-soft);border-left:4px solid var(--teal)}
+main .callout.green{background:var(--green-soft);border-color:var(--green)}
+main .callout.amber{background:var(--amber-soft);border-color:var(--amber)}
+main .callout.red{background:var(--red-soft);border-color:var(--red)}
+main .formula{padding:12px 16px;border-radius:10px;background:var(--paper-2);border:1px dashed var(--line);margin:12px 0;overflow-x:auto;text-align:center}
+main .deriv{margin:14px 0;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+main .deriv .row{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,38%);border-top:1px solid var(--line-2)}
+main .deriv .row:first-child{border-top:0}
+main .deriv .row>div{padding:12px 16px}
+main .deriv .row>div:first-child{overflow-x:auto;background:var(--paper-2)}
+main .deriv .row>div:last-child{font-size:14px;color:var(--ink-2);border-left:1px solid var(--line-2)}
+@media(max-width:700px){main .deriv .row{grid-template-columns:1fr}main .deriv .row>div:last-child{border-left:0;border-top:1px dashed var(--line-2)}}
+main .deriv .hl{background:var(--green-soft)}
+main .tbl{overflow-x:auto;margin:12px 0}
+main table{width:100%;border-collapse:separate;border-spacing:0;font-size:14.5px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+main th{background:var(--teal-soft);color:var(--ink);text-align:left;padding:9px 12px;font-weight:800;font-size:12.5px;border-bottom:1px solid var(--line)}
+main th .katex{font-size:1.15em;font-weight:400}
+main td{padding:8px 12px;border-top:1px solid var(--line-2);font-family:'JetBrains Mono',monospace;font-size:13.5px;vertical-align:middle}
+main tr:first-child td{border-top:0}
+main td.k,main th.k{font-family:Manrope,sans-serif;font-weight:800}
+main td.txt{font-family:Manrope,sans-serif}
+main td.res{background:var(--green-soft);color:var(--green);font-weight:700}
+main td.neg{color:var(--red)} main td.pos{color:var(--green)}
+main td.dim{color:var(--muted)}
+.map{display:grid;grid-template-columns:1fr auto 1fr;gap:10px 14px;align-items:stretch;margin:14px 0}
+@media(max-width:700px){.map{grid-template-columns:1fr}.map .arrow{display:none}}
+.map .cell{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--paper-2)}
+.map .cell h4{margin:0 0 4px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.map .cell.l{border-color:var(--teal)}
+.map .cell.r{border-color:var(--orange)}
+.map .arrow{display:grid;place-items:center;color:var(--muted);font-size:20px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:8px 0 14px}
+.ctl{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--paper-2)}
+.ctl label{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper);flex-wrap:wrap}
+.seg button{font:inherit;font-weight:700;font-size:13.5px;padding:7px 12px;border:0;background:transparent;color:var(--ink-2);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--navy);color:#fff}
+:root[data-theme="dark"] .seg button.on{color:#0e1320}
+input.num{width:84px;font:inherit;font-family:'JetBrains Mono',monospace;font-weight:700;padding:6px 8px;border:2px solid var(--amber);background:var(--amber-soft);color:var(--ink);border-radius:8px;text-align:right}
+.chart{width:100%;height:auto;display:block;margin:10px 0}
+.chart text{font-family:Manrope,sans-serif;font-size:11px;fill:var(--muted)}
+.chart .axis{stroke:var(--line);stroke-width:1}
+.chart .grid{stroke:var(--line-2);stroke-width:1}
+.chart .ttl{font-size:12.5px;font-weight:800;fill:var(--ink)}
+.chart .mono{font-family:'JetBrains Mono',monospace}
+.charts2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:800px){.charts2{grid-template-columns:1fr}}
+main details.deeper{margin:14px 0;border:1px solid var(--line);border-radius:10px;padding:0 16px;background:var(--paper-2)}
+main details.deeper summary{cursor:pointer;font-weight:800;padding:12px 0;color:var(--navy)}
+main details.deeper .deeper-body{padding:0 0 12px;color:var(--ink-2)}
+footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
+.totop{position:fixed;right:16px;bottom:16px;z-index:15;opacity:0;pointer-events:none;transition:opacity .2s}
+.totop.show{opacity:1;pointer-events:auto}
+/* ---- мост токенов для ИИ-ассистента ---- */
+:root{ --accent:var(--teal); --accent-soft:var(--teal-soft); --accent-ink:#ffffff; --accent-hover:var(--navy); --accent-line:var(--teal);
+  --border:var(--line); --border-strong:#cfc8b8; --surface:var(--paper); --surface-2:var(--paper-2); --surface-3:var(--line-2); --page:var(--bg);
+  --shadow-lg:var(--shadow); --ease:cubic-bezier(.2,.7,.2,1); --topbar-h:56px; --sidebar-w:230px; --radius-sm:8px;
+  --critical:var(--red); --critical-soft:#fbe5e2; --critical-text:var(--red); --warn:var(--amber); --warn-soft:var(--amber-soft); --warn-text:var(--amber); --good:var(--green); }
+:root[data-theme="dark"]{ --accent-ink:#0e1320; --border-strong:#3a4252; --critical-soft:#3a1c19; }
+.icon-btn{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);cursor:pointer}
+.icon-btn:hover{border-color:var(--teal);color:var(--teal)}
+.icon-btn svg{width:18px;height:18px}
+.assistant-toggle[aria-pressed="true"]{border-color:var(--teal);color:var(--teal);background:var(--teal-soft)}
+@media (min-width:1281px){
+  body.assistant-open{padding-right:var(--assistant-w)}
+  body.assistant-open .layout:not(.home){grid-template-columns:230px minmax(0,1fr);margin:0 auto;max-width:1180px}
+  body.assistant-open aside.toc{display:block}
+  body.assistant-open .topwrap{margin-right:calc(-1 * var(--assistant-w));padding-right:var(--assistant-w)}
+}
+body.assistant-open .totop{right:calc(var(--assistant-w) + 16px)}
+</style>
+</head>
+<body>
+<div class="topwrap"><div class="topbar">
+  <div class="crumbs"><a href="../../index.html">Бустинг по косточкам</a> <span>›</span> <a href="../README.md">Дополнительные уроки</a> <span>›</span> <span>03. Где спрятан градиентный спуск</span></div>
+  <div class="spacer"></div>
+  <a class="btn" href="../02_learning_rate/index.html">← Урок 02</a>
+  <button class="btn" id="themeBtn" title="Переключить тему"><span id="themeIco">◐</span> <span id="themeTxt">Тема</span></button>
+</div></div>
+
+<div class="layout">
+<aside class="toc"><h4>Содержание</h4><nav id="toc">
+  <a href="#intro">Вопрос</a>
+  <a href="#gd">Что такое спуск</a>
+  <a href="#loss">Потеря как функция F</a>
+  <a href="#partial">Частные производные</a>
+  <a href="#grad">Градиент на числах</a>
+  <a href="#resid">Остаток = антиградиент</a>
+  <a href="#tree">Дерево ≈ градиент</a>
+  <a href="#step">Шаг спуска</a>
+  <a href="#map">Карта соответствий</a>
+  <a href="#losses">Другие потери</a>
+  <a href="#summary">Итоги</a>
+</nav></aside>
+
+<main class="lesson">
+<header class="hero" id="intro">
+  <span class="eyebrow">Дополнительный урок 03 · математика под капотом</span>
+  <h1>Где спрятан градиентный спуск</h1>
+  <p class="lead">В тетрадях мы вычитали, усредняли и умножали на ν — и нигде не брали производную. Но метод называется <em>градиентным</em>. Этот урок показывает, где именно стоит знак ∂, почему его не было видно, и что изменится, если потерю заменить.</p>
+  <div class="idea">Остаток, который вы считали на этапе A, — это вектор антиградиента функции потерь по предсказаниям. Производная не исчезла: для квадратичной потери она «схлопывается» в вычитание.</div>
+  <p class="sub" style="margin-top:12px">Непонятно слово или формула? Выделите фрагмент и нажмите «Спросить ИИ» (Alt+I).</p>
+</header>
+
+<!-- GD -->
+<section class="card" id="gd">
+  <div class="sec-head"><div class="badge">∇</div><div><h2>Что такое градиентный спуск — в одной строке</h2><p class="sub">Та форма, в которой его обычно знают.</p></div></div>
+  <p>Есть параметры $\theta$ и функция потерь $L(\theta)$, которую хотим уменьшить. Градиент $\nabla L$ — вектор частных производных — показывает, в какую сторону $L$ растёт быстрее всего. Шагаем в противоположную:</p>
+  <div class="formula">$$\theta \;\leftarrow\; \theta - \nu\,\nabla L(\theta), \qquad \nabla L = \Big(\frac{\partial L}{\partial \theta_1},\ \frac{\partial L}{\partial \theta_2},\ \dots\Big)$$</div>
+  <p>Три ингредиента: <b>что</b> двигаем ($\theta$), <b>куда</b> (антиградиент $-\nabla L$), <b>на сколько</b> ($\nu$). Чтобы найти спуск в бустинге, нужно найти все три.</p>
+</section>
+
+<!-- LOSS -->
+<section class="card" id="loss">
+  <div class="sec-head"><div class="badge">L</div><div><h2>Шаг 1. Потеря как функция предсказаний</h2><p class="sub">Что здесь «параметры θ»? Не веса — их нет. Сами предсказания.</p></div></div>
+  <p>Данные рабочей тетради № 1 — четыре квартиры. Жёлтые поля можно менять: весь урок пересчитается.</p>
+  <div class="tbl"><table><thead><tr><th class="k">Квартира</th><th>Район</th><th>Ремонт</th><th>$y_i$ (цена)</th><th>Текущее $F(x_i)$</th></tr></thead><tbody id="dataRows"></tbody></table></div>
+  <div class="controls">
+    <div class="ctl"><label>Текущее предсказание $F$ для всех</label><input class="num" id="Fcur" type="number" value="2000" step="10"> <span class="sub">на шаге 1 это $F_0=\bar y$</span></div>
+    <div class="ctl"><label>Learning rate ν</label><div class="seg" id="lrSeg"><button data-v="1">1</button><button data-v="0.5" class="on">0.5</button><button data-v="0.3">0.3</button></div></div>
+  </div>
+  <p>Предсказания $F_A, F_B, F_C, F_D$ — четыре числа, которые модель может менять. Это и есть $\theta$. Квадратичная потеря на всей таблице — функция этих четырёх переменных:</p>
+  <div class="formula" id="lossFormula"></div>
+  <div class="callout">Обратите внимание: $y_i$ — константы (цены известны), переменные — только $F$. Поэтому дифференцировать будем по $F$.</div>
+</section>
+
+<!-- PARTIAL -->
+<section class="card" id="partial">
+  <div class="sec-head"><div class="badge">∂</div><div><h2>Шаг 2. Частная производная по одному предсказанию</h2><p class="sub">Вот здесь стоит знак ∂, которого не было видно в тетради.</p></div></div>
+  <p>Берём $\partial L / \partial F_A$. Три слагаемых из четырёх от $F_A$ не зависят — их производная равна нулю. Остаётся одно:</p>
+  <div class="deriv" id="derivA"></div>
+  <p>Подставляем текущую точку $F_A = $ <span class="mono" id="FcurTxt"></span>:</p>
+  <div class="formula" id="derivAnum"></div>
+  <div class="callout amber" id="derivSign"></div>
+  <details class="deeper"><summary>Почему ½ перед квадратом?</summary><div class="deeper-body"><p>Чтобы производная получилась без двойки: $\frac{d}{dF}\,\tfrac12(y-F)^2 = (y-F)\cdot(-1)$. Без половинки было бы $2(y-F)\cdot(-1)$, и остаток пришлось бы делить на 2. На направление шага это не влияет, только на масштаб; множитель всё равно поглощается learning rate.</p></div></details>
+</section>
+
+<!-- GRADIENT -->
+<section class="card" id="grad">
+  <div class="sec-head"><div class="badge">4</div><div><h2>Шаг 3. Все четыре производные — градиент</h2><p class="sub">Та же выкладка для $F_B$, $F_C$, $F_D$. Собираем в вектор.</p></div></div>
+  <div class="tbl"><table><thead><tr><th class="k">Квартира</th><th>$\partial L/\partial F_i$ (формула)</th><th>Подстановка</th><th>$\partial L/\partial F_i$</th><th>Антиградиент $-\partial L/\partial F_i$</th></tr></thead><tbody id="gradRows"></tbody></table></div>
+  <div class="formula" id="gradVec"></div>
+  <div class="charts2">
+    <div><svg class="chart" id="chLoss"></svg></div>
+    <div><svg class="chart" id="chGrad"></svg></div>
+  </div>
+  <p class="sub">Слева: потеря как функция одного $F_A$ при фиксированных остальных — парабола; касательная в текущей точке имеет наклон $\partial L/\partial F_A$. Справа: четыре компоненты антиградиента столбиками.</p>
+</section>
+
+<!-- RESIDUAL -->
+<section class="card" id="resid">
+  <div class="sec-head"><div class="badge">r</div><div><h2>Шаг 4. Остаток — это антиградиент</h2><p class="sub">Сравните с этапом A тетради.</p></div></div>
+  <div class="tbl"><table><thead><tr><th class="k">Квартира</th><th>Этап A тетради: $r_i = y_i - F(x_i)$</th><th>Антиградиент: $-\partial L/\partial F_i$</th><th>Совпадает?</th></tr></thead><tbody id="cmpRows"></tbody></table></div>
+  <div class="callout green"><b>Вот почему производной не было видно.</b> Для $L=\tfrac12(y-F)^2$ производная равна $-(y-F)$, антиградиент равен $y-F$. Дифференцирование уже выполнено при выводе формулы остатка, и в тетради осталась только арифметика «вычесть». Знак $\partial$ спрятан внутри слова «остаток».</div>
+  <p>На шаге 2 производная берётся снова — в новой точке. Формула та же, $\partial L/\partial F_A = F_A - y_A$, но подставляется уже $F_1(A)$. Поэтому на каждом шаге тетради вы заново вычисляли градиент, не замечая этого.</p>
+</section>
+
+<!-- TREE -->
+<section class="card" id="tree">
+  <div class="sec-head"><div class="badge">h</div><div><h2>Шаг 5. Чего нет в обычном спуске: дерево ≈ градиент</h2><p class="sub">Здесь бустинг отличается от спуска по весам нейросети.</p></div></div>
+  <p>Обычный спуск прибавил бы антиградиент напрямую. Здесь так нельзя: антиградиент известен только в четырёх точках таблицы, а предсказывать нужно для любой квартиры. Поэтому между «посчитать градиент» и «сделать шаг» стоит подзадача — <b>найти функцию $h$, ближайшую к вектору антиградиента</b>, из тех, что умеем строить (деревья):</p>
+  <div class="formula">$$h_m = \arg\min_{h \in \text{деревья}} \sum_i \big(g_i - h(x_i)\big)^2, \qquad g_i = -\frac{\partial L}{\partial F_i}$$</div>
+  <p>Это этапы B и C тетради: пень по колонке «Район» даёт одно число на группу, и лучшее такое число — среднее антиградиентов группы. Вот что получилось:</p>
+  <div class="tbl"><table><thead><tr><th class="k">Квартира</th><th>Антиградиент $g_i$</th><th>Дерево по «Район»: $h(x_i)$</th><th>Дерево по «Ремонт»: $h(x_i)$</th></tr></thead><tbody id="treeRows"></tbody></table></div>
+  <div class="formula" id="treeSse"></div>
+  <div class="callout">Дерево — <b>приближение</b> градиента, а не сам градиент. Чем глубже дерево, тем точнее приближение (пень глубины 1 даёт два числа; дерево глубины 2 — четыре). Отсюда название класса методов: <em>functional gradient descent</em> — спуск, где направление берётся из ограниченного семейства функций.</div>
+</section>
+
+<!-- STEP -->
+<section class="card" id="step">
+  <div class="sec-head"><div class="badge">ν</div><div><h2>Шаг 6. Шаг спуска — это этап D</h2><p class="sub">Сравним честный шаг по градиенту и шаг по дереву.</p></div></div>
+  <div class="tbl"><table><thead><tr><th class="k">Квартира</th><th>Честный спуск: $F - \nu\,\partial L/\partial F$</th><th>Бустинг: $F + \nu\,h(x)$</th><th>Разница</th></tr></thead><tbody id="stepRows"></tbody></table></div>
+  <div class="formula">$$\underbrace{\theta \leftarrow \theta - \nu\,\nabla L}_{\text{спуск}} \quad\Longleftrightarrow\quad \underbrace{F_m \leftarrow F_{m-1} + \nu\,h_m}_{\text{этап D}},\qquad h_m \approx -\nabla L$$</div>
+  <p>Знак плюс вместо минуса — потому что $h$ уже приближает <i>анти</i>градиент. Learning rate $\nu$ — та же буква и тот же смысл, что в обучении нейросетей.</p>
+  <div class="callout amber" id="stepNote"></div>
+</section>
+
+<!-- MAP -->
+<section class="card" id="map">
+  <div class="sec-head"><div class="badge">⇄</div><div><h2>Карта соответствий</h2><p class="sub">Один алгоритм, два языка.</p></div></div>
+  <div class="map">
+    <div class="cell l"><h4>Градиентный спуск</h4>параметры $\theta$</div><div class="arrow">⇄</div><div class="cell r"><h4>Тетрадь</h4>предсказания $F(A), F(B), F(C), F(D)$</div>
+    <div class="cell l"><h4>Спуск</h4>функция потерь $L(\theta)$</div><div class="arrow">⇄</div><div class="cell r"><h4>Тетрадь</h4>$\tfrac12\sum_i (y_i - F(x_i))^2$ — нигде не выписана, но минимизируется</div>
+    <div class="cell l"><h4>Спуск</h4>антиградиент $-\nabla L$</div><div class="arrow">⇄</div><div class="cell r"><h4>Этап A</h4>остатки $r_i = y_i - F(x_i)$</div>
+    <div class="cell l"><h4>Спуск</h4>направление шага</div><div class="arrow">⇄</div><div class="cell r"><h4>Этапы B, C</h4>дерево $h \approx$ остатки: среднее по группе, выбор колонки по SSE</div>
+    <div class="cell l"><h4>Спуск</h4>learning rate $\nu$</div><div class="arrow">⇄</div><div class="cell r"><h4>Этап D</h4>$\nu$ — то же число</div>
+    <div class="cell l"><h4>Спуск</h4>$\theta \leftarrow \theta - \nu\nabla L$</div><div class="arrow">⇄</div><div class="cell r"><h4>Этап D</h4>$F \leftarrow F + \nu h$</div>
+  </div>
+  <p>Полная запись алгоритма, в которой градиент виден явно:</p>
+  <div class="formula" style="text-align:left">$$\begin{aligned}&\text{для } m = 1,\dots,M:\\[2pt]&\quad g_i = -\left.\frac{\partial L(y_i, F)}{\partial F}\right|_{F=F_{m-1}(x_i)} &&\text{градиент (этап A)}\\&\quad h_m = \arg\min_h \sum_i (g_i - h(x_i))^2 &&\text{дерево} \approx \text{градиент (B, C)}\\&\quad F_m = F_{m-1} + \nu\,h_m &&\text{шаг (D)}\end{aligned}$$</div>
+</section>
+
+<!-- LOSSES -->
+<section class="card" id="losses">
+  <div class="sec-head"><div class="badge">L′</div><div><h2>Когда производная перестаёт прятаться</h2><p class="sub">Переключите функцию потерь — и этап A перестанет быть «вычесть».</p></div></div>
+  <div class="controls">
+    <div class="ctl"><label>Функция потерь</label><div class="seg" id="lossSeg"><button data-v="sq" class="on">квадратичная</button><button data-v="abs">абсолютная</button><button data-v="log">логистическая</button></div></div>
+  </div>
+  <div id="lossBlock"></div>
+  <div class="tbl"><table><thead><tr><th class="k">Квартира</th><th>$y_i$</th><th>$F(x_i)$</th><th>$\partial L/\partial F_i$</th><th>Антиградиент $g_i$ — что учит дерево</th></tr></thead><tbody id="lossRows"></tbody></table></div>
+  <div class="callout" id="lossNote"></div>
+</section>
+
+<!-- SUMMARY -->
+<section class="card" id="summary">
+  <div class="sec-head"><div class="badge">✓</div><div><h2>Итоги</h2></div></div>
+  <ol>
+    <li><b>Параметры спуска — предсказания.</b> $L$ — функция четырёх чисел $F(A)\dots F(D)$; дифференцируем по ним, а не по весам.</li>
+    <li><b>Остаток — антиградиент.</b> $\partial L/\partial F_i = F_i - y_i$ для квадратичной потери, поэтому $-\partial L/\partial F_i = y_i - F_i = r_i$. Производная взята один раз при выводе и дальше «живёт» в формуле остатка.</li>
+    <li><b>Дерево — приближение градиента.</b> Обычный спуск прибавляет градиент; бустинг сначала подбирает функцию из деревьев, ближайшую к градиенту (этапы B, C), и прибавляет её.</li>
+    <li><b>Этап D — шаг спуска.</b> $F \leftarrow F + \nu h$ ⇔ $\theta \leftarrow \theta - \nu\nabla L$ с $h \approx -\nabla L$.</li>
+    <li><b>Производная видна, когда потеря не квадратичная.</b> Для $|y-F|$ дерево учит знаки, для логистической — $y - p$. Общая схема та же, меняется только первая строка.</li>
+  </ol>
+  <div class="callout green">Это и есть идея Фридмана (1999): «учиться на остатках» — частный случай градиентного спуска в пространстве функций. Замените потерю — и тот же цикл решает классификацию, ранжирование, квантильную регрессию.</div>
+</section>
+
+<footer>Дополнительный урок курса «Градиентный бустинг по косточкам». Продолжение — <a href="../../lessons/lesson_1_3/web/index.html">урок 1.3 «Производная, градиент и градиентный спуск»</a> и <a href="../../lessons/lesson_5/web/index.html">модуль 5 «Математика Фридмана»</a>. Все числа на странице живые.</footer>
+</main>
+</div>
+<button class="btn totop" id="totop" title="Наверх">↑</button>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  function syncThemeBtn(){ var dark=root.getAttribute("data-theme")==="dark"; var i=document.getElementById("themeIco"), t=document.getElementById("themeTxt"); if(i) i.textContent=dark?"☾":"☀"; if(t) t.textContent=dark?"Тёмная":"Светлая"; }
+  if(!root.getAttribute("data-theme")){ root.setAttribute("data-theme", matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"); }
+  syncThemeBtn();
+  document.getElementById("themeBtn").addEventListener("click",function(){ var next=root.getAttribute("data-theme")==="dark"?"light":"dark"; if(window.GBC&&GBC.page&&GBC.page.setTheme) GBC.page.setTheme(next); else { root.setAttribute("data-theme",next); try{localStorage.setItem("gbc:theme",JSON.stringify(next));}catch(e){} } syncThemeBtn(); render(); });
+
+  var names=["A","B","C","D"], rayon=["окраина","окраина","центр","центр"], remont=["нет","да","нет","да"];
+  var y=[1400,1600,2400,2600], LR=0.5, LOSS="sq";
+  function f2(v){ var s=(Math.round(v*10000)/10000).toString(); return s==="-0"?"0":s; }
+  function sg(v){ return v<0?"("+f2(v)+")":f2(v); }
+  function cls(v){ return v>0?"pos":v<0?"neg":"dim"; }
+  function td(v,c){ return "<td class='"+(c||"")+"'>"+v+"</td>"; }
+  function cssVar(n){ return getComputedStyle(root).getPropertyValue(n).trim(); }
+  function renderMath(el){ if(window.GBC&&GBC.math&&GBC.math.render){ GBC.math.render(el); } }
+  function sigmoid(x){ return 1/(1+Math.exp(-x)); }
+
+  function render(){
+    var F=Number(document.getElementById("Fcur").value)||0;
+    document.getElementById("FcurTxt").textContent=f2(F);
+    // data rows
+    document.getElementById("dataRows").innerHTML=names.map(function(n,i){ return "<tr>"+td(n,"k")+td(rayon[i],"txt")+td(remont[i],"txt")+"<td><input class='num py' data-i='"+i+"' type='number' value='"+y[i]+"'></td>"+td(f2(F))+"</tr>"; }).join("");
+    [].forEach.call(document.querySelectorAll("input.py"),function(inp){ inp.addEventListener("change",function(){ y[Number(inp.dataset.i)]=Number(inp.value)||0; render(); }); });
+    // loss formula
+    document.getElementById("lossFormula").innerHTML="$$L(F_A,F_B,F_C,F_D)=\\tfrac12("+y[0]+"-F_A)^2+\\tfrac12("+y[1]+"-F_B)^2+\\tfrac12("+y[2]+"-F_C)^2+\\tfrac12("+y[3]+"-F_D)^2$$";
+    // derivation A
+    var dA=F-y[0];
+    document.getElementById("derivA").innerHTML=
+      "<div class='row'><div>$$\\frac{\\partial L}{\\partial F_A}=\\frac{\\partial}{\\partial F_A}\\Big[\\tfrac12("+y[0]+"-F_A)^2\\Big]$$</div><div>Три слагаемых с $F_B,F_C,F_D$ дают ноль: от $F_A$ они не зависят.</div></div>"+
+      "<div class='row'><div>$$=("+y[0]+"-F_A)\\cdot\\frac{\\partial}{\\partial F_A}("+y[0]+"-F_A)$$</div><div>Правило цепочки: $\\frac{d}{du}\\tfrac12 u^2=u$, где $u="+y[0]+"-F_A$; дальше производная внутреннего.</div></div>"+
+      "<div class='row'><div>$$=("+y[0]+"-F_A)\\cdot(-1)$$</div><div>$\\frac{\\partial}{\\partial F_A}("+y[0]+"-F_A)=0-1=-1$: константа исчезает, $-F_A$ даёт $-1$.</div></div>"+
+      "<div class='row hl'><div>$$\\frac{\\partial L}{\\partial F_A}=F_A-"+y[0]+"$$</div><div>Вот частная производная. Заметьте: это <b>минус остаток</b>.</div></div>";
+    document.getElementById("derivAnum").innerHTML="$$\\frac{\\partial L}{\\partial F_A}="+f2(F)+"-"+y[0]+"="+f2(dA)+"$$";
+    document.getElementById("derivSign").innerHTML= dA>0
+      ? "<b>Знак плюс:</b> при увеличении $F_A$ потеря растёт. Чтобы уменьшить потерю, $F_A$ надо <b>уменьшать</b> — модель завысила цену квартиры A."
+      : dA<0 ? "<b>Знак минус:</b> при увеличении $F_A$ потеря падает. Чтобы уменьшить потерю, $F_A$ надо <b>увеличивать</b> — модель занизила цену квартиры A."
+      : "<b>Ноль:</b> $F_A$ уже равно $y_A$, двигать некуда.";
+    // gradient table
+    var grad=y.map(function(v){return F-v;}), anti=grad.map(function(v){return -v;});
+    document.getElementById("gradRows").innerHTML=names.map(function(n,i){ return "<tr>"+td(n,"k")+td("$F_"+n+"-"+y[i]+"$","txt")+td(f2(F)+" − "+y[i])+td(f2(grad[i]),cls(grad[i]))+td(f2(anti[i]),"res "+cls(anti[i]))+"</tr>"; }).join("");
+    document.getElementById("gradVec").innerHTML="$$\\nabla L=("+grad.map(f2).join(",\\ ")+"),\\qquad -\\nabla L=("+anti.map(f2).join(",\\ ")+")$$";
+    // compare
+    document.getElementById("cmpRows").innerHTML=names.map(function(n,i){ var r=y[i]-F; return "<tr>"+td(n,"k")+td(y[i]+" − "+f2(F)+" = "+f2(r),cls(r))+td(f2(anti[i]),"res "+cls(anti[i]))+td(Math.abs(r-anti[i])<1e-9?"✓ да":"✗","txt")+"</tr>"; }).join("");
+    // tree approximations
+    var gR=[(anti[0]+anti[1])/2,(anti[2]+anti[3])/2], gM=[(anti[0]+anti[2])/2,(anti[1]+anti[3])/2];
+    var hR=[gR[0],gR[0],gR[1],gR[1]], hM=[gM[0],gM[1],gM[0],gM[1]];
+    var sseR=anti.reduce(function(s,v,i){return s+Math.pow(v-hR[i],2);},0), sseM=anti.reduce(function(s,v,i){return s+Math.pow(v-hM[i],2);},0);
+    var best=sseR<=sseM?"Район":"Ремонт", h=sseR<=sseM?hR:hM;
+    document.getElementById("treeRows").innerHTML=names.map(function(n,i){ return "<tr>"+td(n,"k")+td(f2(anti[i]),cls(anti[i]))+td(f2(hR[i]),(best==="Район"?"res ":"")+cls(hR[i]))+td(f2(hM[i]),(best==="Ремонт"?"res ":"")+cls(hM[i]))+"</tr>"; }).join("");
+    document.getElementById("treeSse").innerHTML="$$\\sum_i (g_i-h(x_i))^2:\\quad \\text{Район} = "+f2(sseR)+",\\qquad \\text{Ремонт} = "+f2(sseM)+"\\quad\\Rightarrow\\quad h_1 \\text{ по «"+best+"»}$$";
+    // step
+    document.getElementById("stepRows").innerHTML=names.map(function(n,i){ var a=F-LR*grad[i], b=F+LR*h[i]; return "<tr>"+td(n,"k")+td(f2(F)+" − "+LR+"·"+sg(grad[i])+" = "+f2(a))+td(f2(F)+" + "+LR+"·"+sg(h[i])+" = "+f2(b),"res")+td(f2(b-a),cls(b-a))+"</tr>"; }).join("");
+    document.getElementById("stepNote").innerHTML="Разница — цена за обобщение: честный спуск двигает каждую квартиру ровно по её градиенту, но для пятой квартиры градиента нет. Дерево двигает <b>группами</b> (по «"+best+"»), чуть грубее, зато умеет предсказать любой объект по его признакам. При ν = "+LR+" оба шага прошли долю "+LR+" пути.";
+    // charts
+    drawLoss(F); drawGrad(anti);
+    // losses section
+    renderLosses(F);
+    renderMath(document.querySelector("main"));
+  }
+
+  function svgEl(id,w,h){ var s=document.getElementById(id); s.setAttribute("viewBox","0 0 "+w+" "+h); s.innerHTML=""; return s; }
+  function lin(d0,d1,r0,r1){ return function(v){ return r0+(v-d0)/(d1-d0||1)*(r1-r0); }; }
+  function drawLoss(F){
+    var W=560,H=300,P={l:52,r:16,t:28,b:34}, s=svgEl("chLoss",W,H);
+    var yA=y[0], lo=Math.min(F,yA)-800, hi=Math.max(F,yA)+800;
+    var pts=[]; for(var x=lo;x<=hi;x+=(hi-lo)/120) pts.push([x,0.5*Math.pow(yA-x,2)]);
+    var mx=Math.max.apply(null,pts.map(function(p){return p[1];}));
+    var sx=lin(lo,hi,P.l,W-P.r), sy=lin(0,mx*1.05,H-P.b,P.t);
+    s.insertAdjacentHTML("beforeend","<text class='ttl' x='"+P.l+"' y='16'>L как функция F_A (остальные F фиксированы)</text><line class='axis' x1='"+P.l+"' y1='"+(H-P.b)+"' x2='"+(W-P.r)+"' y2='"+(H-P.b)+"'/><line class='axis' x1='"+P.l+"' y1='"+P.t+"' x2='"+P.l+"' y2='"+(H-P.b)+"'/>");
+    s.insertAdjacentHTML("beforeend","<path d='"+pts.map(function(p,i){return (i?"L":"M")+sx(p[0]).toFixed(1)+" "+sy(p[1]).toFixed(1);}).join(" ")+"' fill='none' stroke='"+cssVar("--teal")+"' stroke-width='2.2'/>");
+    var L0=0.5*Math.pow(yA-F,2), slope=F-yA, dx=350;
+    s.insertAdjacentHTML("beforeend","<line x1='"+sx(F-dx)+"' y1='"+sy(L0-slope*dx)+"' x2='"+sx(F+dx)+"' y2='"+sy(L0+slope*dx)+"' stroke='"+cssVar("--orange")+"' stroke-width='2' stroke-dasharray='5 4'/>");
+    s.insertAdjacentHTML("beforeend","<circle cx='"+sx(F)+"' cy='"+sy(L0)+"' r='5' fill='"+cssVar("--orange")+"'/><text class='mono' x='"+(sx(F)+8)+"' y='"+(sy(L0)-8)+"'>F_A="+f2(F)+", наклон="+f2(slope)+"</text>");
+    s.insertAdjacentHTML("beforeend","<line x1='"+sx(yA)+"' x2='"+sx(yA)+"' y1='"+P.t+"' y2='"+(H-P.b)+"' stroke='"+cssVar("--green")+"' stroke-dasharray='3 4'/><text x='"+(sx(yA)+6)+"' y='"+(P.t+12)+"' style='fill:"+cssVar("--green")+"'>минимум: F_A = y_A</text>");
+    s.insertAdjacentHTML("beforeend","<text x='"+(W/2)+"' y='"+(H-6)+"' text-anchor='middle'>F_A</text>");
+  }
+  function drawGrad(anti){
+    var W=560,H=300,P={l:52,r:16,t:28,b:34}, s=svgEl("chGrad",W,H);
+    var mx=Math.max.apply(null,anti.map(Math.abs))||1, sy=lin(-mx*1.15,mx*1.15,H-P.b,P.t), sx=lin(0,5,P.l,W-P.r), bw=(sx(1)-sx(0))*0.6;
+    s.insertAdjacentHTML("beforeend","<text class='ttl' x='"+P.l+"' y='16'>Антиградиент −∂L/∂F_i по квартирам = остатки</text><line class='axis' x1='"+P.l+"' y1='"+sy(0)+"' x2='"+(W-P.r)+"' y2='"+sy(0)+"'/>");
+    anti.forEach(function(v,i){ var x=sx(i+1), c=v>=0?cssVar("--green"):cssVar("--red"); s.insertAdjacentHTML("beforeend","<rect x='"+(x-bw/2)+"' y='"+Math.min(sy(v),sy(0))+"' width='"+bw+"' height='"+Math.abs(sy(v)-sy(0))+"' rx='4' fill='"+c+"'/><text class='mono' x='"+x+"' y='"+(v>=0?sy(v)-6:sy(v)+14)+"' text-anchor='middle'>"+f2(v)+"</text><text x='"+x+"' y='"+(H-P.b+16)+"' text-anchor='middle'>"+names[i]+"</text>"); });
+  }
+
+  function renderLosses(F){
+    var block=document.getElementById("lossBlock"), rows=document.getElementById("lossRows"), note=document.getElementById("lossNote");
+    if(LOSS==="sq"){
+      block.innerHTML="<div class='formula'>$$L=\\tfrac12(y-F)^2,\\qquad \\frac{\\partial L}{\\partial F}=-(y-F),\\qquad g=-\\frac{\\partial L}{\\partial F}=y-F$$</div><p>Антиградиент совпадает с остатком — дифференцирование «схлопнулось» в вычитание.</p>";
+      rows.innerHTML=names.map(function(n,i){ var d=F-y[i]; return "<tr>"+td(n,"k")+td(y[i])+td(f2(F))+td("−("+y[i]+" − "+f2(F)+") = "+f2(d),cls(d))+td(f2(-d),"res "+cls(-d))+"</tr>"; }).join("");
+      note.innerHTML="Это случай тетрадей: дерево учит остатки. Величина остатка несёт информацию о том, <i>насколько</i> промахнулись.";
+    } else if(LOSS==="abs"){
+      block.innerHTML="<div class='formula'>$$L=|y-F|,\\qquad \\frac{\\partial L}{\\partial F}=-\\operatorname{sign}(y-F),\\qquad g=\\operatorname{sign}(y-F)\\in\\{-1,+1\\}$$</div><p>Производная модуля — знак. Антиградиент говорит только, <i>куда</i> двигать, но не <i>на сколько</i>.</p>";
+      rows.innerHTML=names.map(function(n,i){ var r=y[i]-F, g=r>0?1:r<0?-1:0; return "<tr>"+td(n,"k")+td(y[i])+td(f2(F))+td("−sign("+f2(r)+") = "+f2(-g),cls(-g))+td(f2(g),"res "+cls(g))+"</tr>"; }).join("");
+      note.innerHTML="<b>Здесь производную уже не спрятать.</b> Дерево учит не остатки −600, −400, 400, 600, а знаки −1, −1, +1, +1. Такой бустинг устойчив к выбросам (один дикий объект даёт всё тот же ±1), но шаги одинаковой величины — поэтому в реальных реализациях (LAD-бустинг, квантильная регрессия) значение листа дополнительно подбирают как медиану остатков.";
+    } else {
+      block.innerHTML="<div class='formula'>$$L=-\\big[y\\ln p+(1-y)\\ln(1-p)\\big],\\quad p=\\sigma(F)=\\frac{1}{1+e^{-F}},\\qquad \\frac{\\partial L}{\\partial F}=p-y,\\qquad g=y-p$$</div><p>Классификация: $y\\in\\{0,1\\}$, $F$ — логит, $p$ — вероятность. Цепочка $\\partial L/\\partial p\\cdot\\partial p/\\partial F$ сворачивается в $p-y$. Для примера пусть $y$ = 1, если цена выше "+f2((y[0]+y[3])/2)+", а $F$ — текущий логит.</p>";
+      var Fl=[-1,-0.5,0.5,1], yl=y.map(function(v){return v>(y[0]+y[3])/2?1:0;});
+      rows.innerHTML=names.map(function(n,i){ var p=sigmoid(Fl[i]), d=p-yl[i]; return "<tr>"+td(n,"k")+td(yl[i])+td("F="+Fl[i]+", p="+f2(Math.round(p*1000)/1000))+td("p − y = "+f2(Math.round(d*1000)/1000),cls(d))+td(f2(Math.round(-d*1000)/1000),"res "+cls(-d))+"</tr>"; }).join("");
+      note.innerHTML="<b>Антиградиент = $y - p$: факт минус вероятность.</b> Это «остаток» классификации — его учит каждое дерево в XGBoost/LightGBM/CatBoost при <code>objective = binary:logistic</code>. Тот же цикл A → B → C → D, изменилась только формула первой строки. В настоящих библиотеках значение листа ещё делится на сумму $p(1-p)$ — это второй порядок, шаг Ньютона вместо градиентного; идея та же.";
+    }
+  }
+
+  [].forEach.call(document.querySelectorAll("#lrSeg button"),function(b){ b.addEventListener("click",function(){ LR=Number(b.dataset.v); [].forEach.call(document.querySelectorAll("#lrSeg button"),function(x){x.classList.toggle("on",x===b);}); render(); }); });
+  [].forEach.call(document.querySelectorAll("#lossSeg button"),function(b){ b.addEventListener("click",function(){ LOSS=b.dataset.v; [].forEach.call(document.querySelectorAll("#lossSeg button"),function(x){x.classList.toggle("on",x===b);}); renderLosses(Number(document.getElementById("Fcur").value)||0); renderMath(document.getElementById("losses")); }); });
+  document.getElementById("Fcur").addEventListener("change",render);
+  var links=[].slice.call(document.querySelectorAll("#toc a")), secs=links.map(function(a){return document.querySelector(a.getAttribute("href"));});
+  function onScroll(){ var yy=window.scrollY+90, cur=0; secs.forEach(function(s,i){ if(s&&s.offsetTop<=yy) cur=i; }); links.forEach(function(a,i){ a.classList.toggle("active",i===cur); }); document.getElementById("totop").classList.toggle("show",window.scrollY>600); }
+  window.addEventListener("scroll",onScroll,{passive:true}); onScroll();
+  document.getElementById("totop").addEventListener("click",function(){ window.scrollTo({top:0,behavior:"smooth"}); });
+  render();
+  window.addEventListener("load",function(){ renderMath(document.body); });
+  if(window.GBC&&GBC.bus) GBC.bus.on("mathready",function(){ renderMath(document.querySelector("main")); });
+})();
+</script>
+</body>
+</html>
