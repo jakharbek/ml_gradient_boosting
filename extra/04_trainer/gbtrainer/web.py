@@ -39,7 +39,8 @@ def _spec(req: dict[str, Any], seed_offset: int = 0):
     if req.get("source") == "custom":
         return make_spec(data=req.get("data") or {}, level=level, **settings)
     seed = int(req.get("seed") or 0) + seed_offset
-    return make_spec(level=level, theme=req.get("theme") or None, seed=seed, **settings)
+    theme = req.get("theme_def") or req.get("theme") or None  # theme_def — сюжет ИИ-ассистента
+    return make_spec(level=level, theme=theme, seed=seed, **settings)
 
 
 def _ok(payload: dict[str, Any]) -> str:
@@ -111,4 +112,43 @@ def spec_json(req_json: str) -> str:
     try:
         return _ok({"spec": spec_to_dict(_spec(json.loads(req_json)))})
     except (SpecError, ValueError, KeyError, TypeError) as e:
+        return _err(e)
+
+
+# --- сюжет от ИИ-ассистента ---------------------------------------------------------------
+def ai_request(req_json: str) -> str:
+    """Что отправить на claude-server: сообщения и JSON-схема ответа."""
+    from .ai import AI_SCHEMA, build_messages
+
+    req = json.loads(req_json)
+    return _ok({"messages": build_messages(str(req.get("description") or ""), list(req.get("avoid") or [])),
+                "schema": AI_SCHEMA})
+
+
+def ai_accept(reply: str) -> str:
+    """Разобрать и проверить ответ модели → сюжет (для хранения в браузере) и заметки о поправках."""
+    from .ai import parse_reply, theme_from_proposal, theme_to_dict
+
+    try:
+        th, notes = theme_from_proposal(parse_reply(reply))
+        return _ok({"theme": theme_to_dict(th), "notes": notes})
+    except SpecError as e:
+        return _err(e)
+
+
+def ai_repair(req_json: str) -> str:
+    """Сообщения для повторной попытки: прошлый ответ + что в нём не так."""
+    from .ai import repair_messages
+
+    req = json.loads(req_json)
+    return _ok({"messages": repair_messages(req["messages"], str(req.get("reply") or ""), str(req.get("error") or ""))})
+
+
+def theme_check(theme_json: str) -> str:
+    """Проверить сохранённый или загруженный из файла сюжет (данные из браузера недоверенные)."""
+    from .ai import theme_from_dict, theme_to_dict
+
+    try:
+        return _ok({"theme": theme_to_dict(theme_from_dict(json.loads(theme_json)))})
+    except (SpecError, ValueError, TypeError) as e:
         return _err(e)

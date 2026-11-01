@@ -498,6 +498,60 @@
     return text;
   }
 
+  /**
+   * Один запрос без потока — для страниц, которым нужен готовый ответ (например, JSON):
+   * GBC.assistant.complete(messages, {jsonSchema, signal}) → текст ответа.
+   * Те же адрес, модель, токен и сообщения об ошибках, что у панели ассистента. С jsonSchema
+   * claude-server ограничивает генерацию схемой (claude -p --json-schema) и отдаёт JSON-текст.
+   * Ошибка содержит kind: config | offline | forbidden | server.
+   */
+  async function complete(messages, opts) {
+    const o = opts || {};
+    const s = settings();
+    const url = normalizeUrl(s.url);
+    if (!url) throw Object.assign(new Error('В настройках ассистента указан неверный адрес сервера.'), { kind: 'config' });
+    const body = { model: s.model, effort: s.effort, stream: false, messages };
+    if (o.jsonSchema) body.json_schema = o.jsonSchema;
+    let res;
+    try {
+      res = await fetch(url + '/v1/chat/completions', { method: 'POST', headers: headers(), body: JSON.stringify(body), signal: o.signal });
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      throw Object.assign(new Error('Не удалось связаться с claude-server (' + url + ').'), { kind: 'offline' });
+    }
+    let j = null;
+    try {
+      j = await res.json();
+    } catch (e) {
+      /* тело не JSON */
+    }
+    if (!res.ok) {
+      let msg = (j && j.error && j.error.message) || 'Сервер ответил ошибкой ' + res.status + '.';
+      let kind = 'server';
+      if (res.status === 401) msg = 'Сервер требует токен: укажите его в настройках ассистента.';
+      if (res.status === 403) kind = 'forbidden';
+      throw Object.assign(new Error(msg), { kind, status: res.status });
+    }
+    const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+    if (typeof text !== 'string' || !text.trim()) throw Object.assign(new Error('Модель вернула пустой ответ. Попробуйте ещё раз.'), { kind: 'server' });
+    return text;
+  }
+
+  /** Состояние сервера без панели: {online, forbidden, url, model}. */
+  async function ping() {
+    const online = await checkServer();
+    const s = settings();
+    return { online, forbidden: !!state.serverForbidden, url: normalizeUrl(s.url), model: s.model };
+  }
+
+  /** Открыть панель ассистента сразу с настройками (адрес сервера, модель, токен). */
+  function openSettings() {
+    if (!el.toggle) return false; // ассистент не подключён на этой странице
+    open(null);
+    toggleSettings(true);
+    return true;
+  }
+
   /* --------------------------------- сообщения ------------------------------------ */
   const nearBottom = () => el.body.scrollHeight - el.body.scrollTop - el.body.clientHeight < 80;
   const toBottom = () => (el.body.scrollTop = el.body.scrollHeight);
@@ -1087,6 +1141,6 @@
     });
   }
 
-  Object.assign(GBC.assistant, { init, open, close, textOf, captureScreenshot });
+  Object.assign(GBC.assistant, { init, open, close, textOf, captureScreenshot, complete, ping, openSettings, settings });
   if (GBC.bus) GBC.bus.on('pageready', init);
 })(typeof window !== 'undefined' ? window : globalThis);

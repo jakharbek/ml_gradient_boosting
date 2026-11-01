@@ -31,6 +31,8 @@ class Theme:
     base: tuple[int, int, int]  # база: от, до, шаг сетки
     effect: tuple[int, int, int]  # самый слабый вклад: от, до, шаг сетки
     noise: tuple[int, int]  # амплитуда шума: от, до
+    rationale: str = ""  # почему признаки так влияют на y (сюжеты от ИИ-ассистента)
+    source: str = "builtin"  # builtin | ai
 
 
 def _f(name: str, low: str, high: str) -> FeatureDef:
@@ -75,6 +77,7 @@ THEMES: dict[str, Theme] = {
 
 
 def get_theme(key: str) -> Theme:
+    """Встроенный сюжет по ключу (сюжеты ИИ-ассистента передаются объектом Theme)."""
     try:
         return THEMES[key]
     except KeyError:

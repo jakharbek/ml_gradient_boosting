@@ -17,7 +17,7 @@ from itertools import product
 from .model import LETTERS, Dataset, Level, SpecError, Structure, get_level, make_dataset
 from .rng import Mulberry32
 from .solver import solve
-from .themes import THEMES, get_theme
+from .themes import THEMES, Theme, get_theme
 
 PATTERNS = {
     1: [(1,)],
@@ -36,7 +36,7 @@ def random_dataset(
     *,
     seed: int,
     level: int | Level = 3,
-    theme: str | None = None,
+    theme: str | Theme | None = None,
     features: int | None = None,
     noise: bool | None = None,
     lr: Decimal | None = None,
@@ -46,8 +46,11 @@ def random_dataset(
     """Сгенерировать данные. ``avoid_near_ties`` — подобрать вариант без почти равных сумм
     при выборе колонки (нужно строгой проверке: ученик с другим округлением мог бы выбрать иначе)."""
     lv = level if isinstance(level, Level) else get_level(level)
-    key = theme if theme and theme != "random" else theme_for_seed(seed)
-    th = get_theme(key)
+    if isinstance(theme, Theme):
+        th = theme
+    else:
+        th = get_theme(theme if theme and theme != "random" else theme_for_seed(seed))
+    key = th.key
     k = features or lv.features
     if k not in PATTERNS or k > len(th.features):
         raise SpecError("случайные данные строятся для 1–3 признаков")
