@@ -1,0 +1,53 @@
+{
+  "$comment": "Данные рабочей тетради № 7 — пересобрать: python extra/04_trainer/generate.py --data presets/wb7_bakery.json",
+  "theme": "bakery",
+  "number": 7,
+  "catalog": 25,
+  "level": 3,
+  "lr": 0.5,
+  "mode": "gradient",
+  "features": [
+    "Расположение",
+    "Выходной"
+  ],
+  "rows": [
+    [
+      "A",
+      "спальный",
+      "нет",
+      50
+    ],
+    [
+      "B",
+      "спальный",
+      "да",
+      62
+    ],
+    [
+      "C",
+      "торговый",
+      "нет",
+      94
+    ],
+    [
+      "D",
+      "торговый",
+      "да",
+      114
+    ]
+  ],
+  "structure": {
+    "base": 80,
+    "effects": [
+      24,
+      8
+    ],
+    "noise": [
+      2,
+      -2,
+      -2,
+      2
+    ]
+  },
+  "steps": 20
+}

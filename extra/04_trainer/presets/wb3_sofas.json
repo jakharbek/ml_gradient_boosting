@@ -1,0 +1,53 @@
+{
+  "$comment": "Данные рабочей тетради № 3 — пересобрать: python extra/04_trainer/generate.py --data presets/wb3_sofas.json",
+  "theme": "sofas",
+  "number": 3,
+  "catalog": 3,
+  "level": 3,
+  "lr": 0.5,
+  "mode": "residual",
+  "features": [
+    "Обивка",
+    "Раскладной"
+  ],
+  "rows": [
+    [
+      "A",
+      "ткань",
+      "нет",
+      366
+    ],
+    [
+      "B",
+      "ткань",
+      "да",
+      474
+    ],
+    [
+      "C",
+      "кожа",
+      "нет",
+      714
+    ],
+    [
+      "D",
+      "кожа",
+      "да",
+      846
+    ]
+  ],
+  "structure": {
+    "base": 600,
+    "effects": [
+      180,
+      60
+    ],
+    "noise": [
+      6,
+      -6,
+      -6,
+      6
+    ]
+  },
+  "steps": 20
+}

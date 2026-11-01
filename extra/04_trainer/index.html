@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ru" data-lesson="extra_04">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Генератор рабочих тетрадей — бустинг своими руками</title>
+<meta name="description" content="Генератор Excel-тренажёров: градиентный бустинг вручную, свои или случайные данные, любое число шагов и learning rate, самопроверка в каждой ячейке.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="icon" href="../../shared/web/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../shared/web/css/assistant.css">
+<script>window.GBC_EXTRA_LESSON = {"id":"extra_04","number":"Доп. 04","title":"Генератор рабочих тетрадей","subtitle":"Excel-тренажёр «градиентный бустинг своими руками»: свои или случайные данные, любое число шагов и ν","summary":"Страница собирает рабочую тетрадь .xlsx: лист «Задание» с данными и порядком действий, лист «Расчёт», где ученик сам считает этапы A–D каждого шага (градиент, остатки, группы, выбор колонки, шаг спуска) и видит ✓/✗ рядом с каждым числом, «Сводка» с графиками и скрытый ключ. Данные — случайные по уровню сложности и сюжету или свои.","objectives":["собрать тетрадь со своими или случайными данными","выбрать уровень, число шагов, learning rate и режим проверки","раздать классу разные варианты одним архивом","понять, как тетрадь проверяет ответы"]};</script>
+<script src="../../shared/web/js/boot.js" data-root="../../" data-page="extra" data-scripts="gbtrainer_bundle.js,trainer.js"></script>
+<style>
+:root{
+  --bg:#f6f4ee; --paper:#ffffff; --paper-2:#faf8f3; --ink:#1b1f2a; --ink-2:#3b4252; --muted:#6b7280; --line:#e4dfd4; --line-2:#efebe2;
+  --navy:#1f3864; --teal:#2e75b6; --teal-soft:#e6eef8; --orange:#e07b2a; --orange-soft:#fbeedf; --purple:#5b2c83; --purple-soft:#efe5fa;
+  --green:#1b7f4b; --green-soft:#e3f3e8; --amber:#b7791f; --amber-soft:#fdf2d8; --red:#c0392b; --red-soft:#fbe5e2;
+  --radius:14px; --shadow:0 10px 30px rgba(27,31,42,.06);
+}
+:root[data-theme="dark"]{
+  --bg:#12151c; --paper:#1a1e28; --paper-2:#20252f; --ink:#eceff4; --ink-2:#c7cdd8; --muted:#97a0b0; --line:#2c3341; --line-2:#262c38;
+  --navy:#9db8e8; --teal:#6aa6e0; --teal-soft:#1c2b40; --orange:#f09a52; --orange-soft:#3a2816; --purple:#c9a7ee; --purple-soft:#2c2140;
+  --green:#5ac98a; --green-soft:#17301f; --amber:#e3b25a; --amber-soft:#3a2d12; --red:#ef7a6d; --red-soft:#3a1c19;
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:72px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Manrope,system-ui,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;font-size:16px}
+a{color:var(--teal)}
+code{font-family:'JetBrains Mono',monospace;font-size:.88em;background:var(--paper-2);border:1px solid var(--line-2);border-radius:6px;padding:1px 5px}
+pre{font-family:'JetBrains Mono',monospace;font-size:13px;background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;line-height:1.5;margin:10px 0}
+pre code{background:none;border:0;padding:0}
+.topwrap{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);height:var(--topbar-h)}
+.topbar{max-width:1180px;margin:0 auto;padding:0 16px;height:100%;display:flex;align-items:center;gap:14px}
+.topbar .crumbs{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .crumbs a{color:var(--muted);text-decoration:none}
+.topbar .spacer{flex:1}
+.btn{font:inherit;font-weight:700;font-size:13px;padding:7px 12px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;display:inline-flex;gap:6px;align-items:center;text-decoration:none}
+.btn:hover{border-color:var(--teal);color:var(--teal)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn.primary:hover{background:var(--navy);border-color:var(--navy);color:#fff}
+:root[data-theme="dark"] .btn.primary,:root[data-theme="dark"] .btn.primary:hover{color:#0e1320}
+.btn.big{font-size:15px;padding:11px 18px;border-radius:12px}
+.layout{max-width:1180px;margin:0 auto;padding:0 16px 80px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:36px}
+@media(max-width:900px){.layout{grid-template-columns:1fr;gap:0}}
+aside.toc{position:sticky;top:72px;align-self:start;max-height:calc(100vh - 90px);overflow:auto;padding-top:28px}
+@media(max-width:900px){aside.toc{position:static;max-height:none;padding-top:14px}}
+.toc h4{margin:0 0 8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.toc a{display:block;padding:6px 10px;border-left:2px solid var(--line);color:var(--ink-2);text-decoration:none;font-size:13.5px;font-weight:600}
+.toc a:hover,.toc a.active{color:var(--teal);border-left-color:var(--teal)}
+@media(max-width:900px){.toc nav{display:flex;flex-wrap:wrap;gap:6px}.toc a{border:1px solid var(--line);border-radius:999px;padding:5px 11px}.toc h4{display:none}}
+main{min-width:0}
+header.hero{padding:40px 0 10px}
+.eyebrow{display:inline-block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);font-weight:800;margin-bottom:12px}
+h1{font-size:clamp(28px,4.6vw,44px);line-height:1.1;margin:0 0 14px;font-weight:800;letter-spacing:-.02em}
+.lead{font-size:17px;color:var(--ink-2);max-width:720px;margin:0}
+main section.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:26px;margin:22px 0}
+@media(max-width:600px){main section.card{padding:18px 16px}}
+.sec-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:10px}
+.badge{flex:0 0 42px;height:42px;border-radius:11px;background:var(--navy);color:#fff;display:grid;place-items:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:17px}
+:root[data-theme="dark"] .badge{color:#0e1320}
+main h2{margin:3px 0 4px;font-size:23px;letter-spacing:-.01em}
+main h3{font-size:17px;margin:22px 0 8px}
+main .sub{color:var(--muted);margin:0;max-width:720px}
+main p{margin:10px 0}
+.callout{margin:16px 0;padding:13px 16px;border-radius:10px;background:var(--teal-soft);border-left:4px solid var(--teal)}
+.callout.green{background:var(--green-soft);border-color:var(--green)}
+.callout.amber{background:var(--amber-soft);border-color:var(--amber)}
+.callout.red{background:var(--red-soft);border-color:var(--red)}
+.callout p{margin:4px 0}
+
+/* --- статус загрузки Python --- */
+.boot{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:12px;border:1px solid var(--line);background:var(--paper-2);margin:16px 0 0;font-weight:600;font-size:14.5px}
+.boot .dot{width:10px;height:10px;border-radius:50%;background:var(--amber);flex:0 0 10px;animation:pulse 1.2s infinite}
+.boot.ready .dot{background:var(--green);animation:none}
+.boot.fail .dot{background:var(--red);animation:none}
+.boot.fail{background:var(--red-soft);border-color:var(--red)}
+@keyframes pulse{50%{opacity:.35}}
+
+/* --- настройки --- */
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:12px 0}
+.ctl{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--paper-2);min-width:0}
+.ctl>label,.ctl>.lbl{display:block;font-size:13px;letter-spacing:.01em;color:var(--muted);font-weight:800;margin-bottom:8px}
+.ctl small{display:block;color:var(--muted);font-size:12.5px;margin-top:6px;line-height:1.45}
+.ctl.wide{grid-column:1/-1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper);max-width:100%}
+.seg button{font:inherit;font-weight:700;font-size:13.5px;line-height:1.3;padding:7px 12px;border:0;background:transparent;color:var(--ink-2);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--navy);color:#fff}
+:root[data-theme="dark"] .seg button.on{color:#0e1320}
+.levels{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+@media(max-width:700px){.levels{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.levels button{font:inherit;text-align:left;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);padding:9px 10px;cursor:pointer;line-height:1.3}
+.levels button b{display:block;font-size:13px}
+.levels button span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.levels button.on{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-soft);background:var(--teal-soft)}
+input.in,select.in{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);min-width:0}
+input.in.num{font-family:'JetBrains Mono',monospace;width:96px;text-align:right}
+input.in:focus,select.in:focus{outline:2px solid var(--teal-soft);border-color:var(--teal)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:6px 0;cursor:pointer}
+.chk input{margin-top:4px}
+
+/* --- таблица данных --- */
+.tbl{overflow-x:auto;margin:12px 0;position:relative}
+table.data{border-collapse:separate;border-spacing:0;font-size:14px;border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:100%}
+table.data th{background:var(--teal-soft);padding:6px 6px;border-bottom:1px solid var(--line);text-align:left}
+table.data td{padding:4px 6px;border-top:1px solid var(--line-2)}
+table.data tr:first-child td{border-top:0}
+table.data input{font:inherit;font-size:13.5px;width:100%;min-width:90px;padding:5px 7px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--ink)}
+table.data th input{font-weight:800}
+table.data input:hover{border-color:var(--line)}
+table.data input:focus{border-color:var(--teal);background:var(--paper);outline:0}
+table.data td.y input{font-family:'JetBrains Mono',monospace;text-align:right;background:var(--amber-soft);min-width:84px}
+table.data td.nm input{font-weight:800;min-width:56px}
+table.data .x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:6px}
+table.data .x:hover{color:var(--red);background:var(--red-soft)}
+.src-note{font-size:13.5px;color:var(--muted);overflow-wrap:anywhere}
+textarea.in{width:100%;min-height:120px;font-family:'JetBrains Mono',monospace;font-size:13px}
+
+/* --- предпросмотр --- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0}
+.stat{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--paper-2)}
+.stat .l{font-size:12.5px;color:var(--muted);font-weight:800}
+.stat .v{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
+.preview-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:800px){.preview-grid{grid-template-columns:1fr}}
+svg.spark{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:10px;background:var(--paper-2)}
+svg.spark text{font-family:Manrope,sans-serif;font-size:12px;fill:var(--muted)}
+svg.spark .axis{stroke:var(--line);stroke-width:1}
+svg.spark .line{fill:none;stroke:var(--teal);stroke-width:2.5}
+svg.spark .pt{fill:var(--teal);stroke:var(--paper-2);stroke-width:2}
+svg.spark .floor{stroke:var(--orange);stroke-width:1.5;stroke-dasharray:5 4}
+svg.spark .floor-t{fill:var(--orange);font-weight:700}
+.traj{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.traj table{width:100%;border-collapse:collapse;font-size:13.5px}
+.traj th{position:sticky;top:0;background:var(--teal-soft);text-align:left;padding:6px 10px;font-size:12px}
+.traj td{padding:5px 10px;border-top:1px solid var(--line-2);font-variant-numeric:tabular-nums}
+.traj td.n{font-family:'JetBrains Mono',monospace;text-align:right}
+.traj tr.tie td{background:var(--amber-soft)}
+.dl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:16px 0 4px}
+.err{color:var(--red);font-weight:700}
+.sheets{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0}
+.sheets div{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--paper-2);font-size:14px}
+.sheets b{display:block;color:var(--navy);margin-bottom:3px}
+.marks{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:12px 0}
+.marks div{border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13.5px;background:var(--paper)}
+.marks b{font-size:18px;margin-right:6px}
+.m-ok b{color:var(--green)} .m-bad b{color:var(--red)} .m-warn b{color:var(--orange)} .m-dim b{color:var(--muted)}
+.steps4{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0}
+.steps4 div{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;background:var(--paper)}
+.steps4 div.gd{border-color:var(--purple);background:var(--purple-soft)}
+.steps4 b{display:block}
+table.cmp{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+table.cmp th{background:var(--teal-soft);text-align:left;padding:8px 10px;font-size:12.5px}
+table.cmp td{padding:8px 10px;border-top:1px solid var(--line-2);vertical-align:top}
+footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
+[hidden]{display:none!important}
+/* ---- мост токенов для ИИ-ассистента ---- */
+:root{ --accent:var(--teal); --accent-soft:var(--teal-soft); --accent-ink:#ffffff; --accent-hover:var(--navy); --accent-line:var(--teal);
+  --border:var(--line); --border-strong:#cfc8b8; --surface:var(--paper); --surface-2:var(--paper-2); --surface-3:var(--line-2); --page:var(--bg);
+  --shadow-lg:var(--shadow); --ease:cubic-bezier(.2,.7,.2,1); --topbar-h:56px; --sidebar-w:230px; --radius-sm:8px;
+  --critical:var(--red); --critical-soft:#fbe5e2; --critical-text:var(--red); --warn:var(--amber); --warn-soft:var(--amber-soft); --warn-text:var(--amber); --good:var(--green); }
+:root[data-theme="dark"]{ --accent-ink:#0e1320; --border-strong:#3a4252; --critical-soft:#3a1c19; }
+.icon-btn{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);cursor:pointer}
+.icon-btn:hover{border-color:var(--teal);color:var(--teal)}
+.icon-btn svg{width:18px;height:18px}
+.assistant-toggle[aria-pressed="true"]{border-color:var(--teal);color:var(--teal);background:var(--teal-soft)}
+@media (min-width:1281px){
+  body.assistant-open{padding-right:var(--assistant-w)}
+  body.assistant-open .layout:not(.home){grid-template-columns:230px minmax(0,1fr);margin:0 auto;max-width:1180px}
+  body.assistant-open .topwrap{margin-right:calc(-1 * var(--assistant-w));padding-right:var(--assistant-w)}
+}
+</style>
+</head>
+<body>
+<div class="topwrap"><div class="topbar">
+  <div class="crumbs"><a href="../../index.html">Бустинг по косточкам</a> <span>›</span> <a href="../README.md">Дополнительные уроки</a> <span>›</span> <span>04. Генератор рабочих тетрадей</span></div>
+  <div class="spacer"></div>
+  <a class="btn" href="../02_learning_rate/index.html">← Урок 02</a>
+  <button class="btn" id="themeBtn" title="Переключить тему"><span id="themeIco">◐</span> <span id="themeTxt">Тема</span></button>
+</div></div>
+
+<div class="layout">
+<aside class="toc"><h4>Содержание</h4><nav id="toc">
+  <a href="#intro">Что это</a>
+  <a href="#settings">Настройки</a>
+  <a href="#data">Данные</a>
+  <a href="#preview">Предпросмотр и скачивание</a>
+  <a href="#class">Варианты для класса</a>
+  <a href="#inside">Как устроена тетрадь</a>
+  <a href="#cli">Командная строка</a>
+</nav></aside>
+
+<main class="lesson">
+<header class="hero" id="intro">
+  <span class="eyebrow">Дополнительный урок 04 · инструмент</span>
+  <h1>Генератор рабочих тетрадей</h1>
+  <p class="lead">Excel-тренажёр «градиентный бустинг своими руками»: ученик сам считает каждый шаг — градиент, остатки, группы, выбор колонки, шаг спуска — а рядом с каждым числом появляется ✓ или ✗. Данные — случайные по уровню сложности или ваши; число шагов, learning rate и способ проверки — любые.</p>
+  <div class="boot" id="boot"><span class="dot"></span><span id="bootText">Загружаю Python в браузер…</span></div>
+</header>
+
+<section class="card" id="settings">
+  <div class="sec-head"><div class="badge">1</div><div><h2>Настройки</h2><p class="sub">Уровень задаёт число признаков, ν, шум и число шагов по умолчанию; любое поле можно переопределить.</p></div></div>
+  <div class="controls">
+    <div class="ctl wide"><span class="lbl">Уровень сложности</span><div class="levels" id="levels"></div><small id="levelAbout"></small></div>
+    <div class="ctl"><span class="lbl">Данные</span>
+      <div class="seg" id="sourceSeg"><button data-v="random" class="on">Случайные</button><button data-v="custom">Свои</button></div>
+      <small>«Свои» включаются сами, как только вы поправите таблицу ниже.</small></div>
+    <div class="ctl"><label for="theme">Сюжет случайных данных</label><select class="in" id="theme"><option value="random">Наугад (по seed)</option></select>
+      <small>Ноутбуки, автомобили, пекарни, скорая… — с правдоподобными числами.</small></div>
+    <div class="ctl"><label for="seed">Seed варианта</label><div class="row"><input class="in num" id="seed" type="number" min="0" max="999999" step="1"><button class="btn" id="seedBtn" title="Новый случайный вариант">↻ Новый</button></div>
+      <small>Один и тот же seed — одна и та же тетрадь (и здесь, и в командной строке).</small></div>
+    <div class="ctl"><label for="steps">Число шагов</label><input class="in num" id="steps" type="number" min="1" max="50" step="1" placeholder="20"><small>От 1 до 50. Пусто — по уровню.</small></div>
+    <div class="ctl"><label for="lr">Learning rate ν</label><input class="in num" id="lr" type="text" inputmode="decimal" placeholder="0.5"><small>Из (0; 1], до сотых: 1, 0.5, 0.4, 0.25… Пусто — по уровню.</small></div>
+    <div class="ctl"><span class="lbl">Этап A</span>
+      <div class="seg" id="modeSeg"><button data-v="gradient" class="on">Градиент + остатки</button><button data-v="residual">Только остатки</button></div>
+      <small>С градиентом ∂L/∂F — как тетради № 5–7; только остатки — как № 2–4.</small></div>
+    <div class="ctl"><span class="lbl">Проверка ответов</span>
+      <div class="seg" id="checkSeg"><button data-v="chain" class="on">По цепочке</button><button data-v="strict">Строгая (по ключу)</button></div>
+      <small id="checkAbout"></small></div>
+    <div class="ctl"><span class="lbl">Оформление</span>
+      <div class="row"><label for="number" class="src-note">Тетрадь №</label><input class="in num" id="number" type="number" min="1" step="1" placeholder="—" style="width:76px">
+      <label for="catalog" class="src-note">в каталоге №</label><input class="in num" id="catalog" type="number" min="1" step="1" placeholder="—" style="width:76px"></div>
+      <label class="chk"><input type="checkbox" id="key" checked> Скрытый лист «Ответы» (ключ)</label>
+      <label class="chk"><input type="checkbox" id="protect"> Защитить листы: менять можно только жёлтые ячейки</label>
+      <label class="chk"><input type="checkbox" id="formulas"> Засчитывать формулы в жёлтых ячейках</label></div>
+  </div>
+</section>
+
+<section class="card" id="data">
+  <div class="sec-head"><div class="badge">2</div><div><h2>Данные</h2><p class="sub">Объекты, бинарные признаки (у каждого ровно два значения) и целевая величина y. Все ячейки редактируются; y — до сотых.</p></div></div>
+  <p class="src-note" id="srcNote"></p>
+  <div class="tbl"><table class="data" id="dataTable"></table></div>
+  <div class="row">
+    <button class="btn" id="addRow">+ Объект</button>
+    <button class="btn" id="addFeat">+ Признак</button>
+    <button class="btn" id="delFeat">− Признак</button>
+    <span class="spacer" style="flex:1"></span>
+    <button class="btn" id="importBtn">Вставить из Excel / CSV…</button>
+    <label class="btn" for="fileIn">Открыть файл…</label><input type="file" id="fileIn" accept=".csv,.tsv,.txt,.json" hidden>
+    <button class="btn" id="exportBtn">Сохранить как JSON</button>
+  </div>
+  <div id="importBox" hidden>
+    <p class="src-note">Скопируйте таблицу из Excel или Google Таблиц (заголовок + строки: объект, признаки…, y) и вставьте сюда.</p>
+    <textarea class="in" id="importText" placeholder="Пекарня&#9;Расположение&#9;Выходной&#9;Выпечка, кг&#10;A&#9;спальный&#9;нет&#9;50&#10;B&#9;спальный&#9;да&#9;62"></textarea>
+    <div class="row" style="margin-top:8px"><button class="btn primary" id="importApply">Загрузить</button><button class="btn" id="importCancel">Отмена</button></div>
+  </div>
+</section>
+
+<section class="card" id="preview">
+  <div class="sec-head"><div class="badge">3</div><div><h2>Предпросмотр и скачивание</h2><p class="sub">Эталонный путь — то, что получит аккуратный ученик. Это для вас: в тетради ученика этих чисел нет.</p></div></div>
+  <div id="pvError" class="callout red" hidden></div>
+  <div id="pvBody">
+    <div class="stats" id="stats"></div>
+    <div class="preview-grid">
+      <div><svg class="spark" id="spark" viewBox="0 0 600 220" role="img" aria-label="Σ|r| по шагам"></svg></div>
+      <div class="traj"><table><thead><tr><th>Шаг</th><th>Колонка</th><th style="text-align:right">Σ|rᵢ|</th></tr></thead><tbody id="trajBody"></tbody></table></div>
+    </div>
+    <div id="warnings"></div>
+  </div>
+  <div class="dl">
+    <button class="btn primary big" id="dlStudent" disabled>Скачать тетрадь (.xlsx)</button>
+    <button class="btn big" id="dlTeacher" disabled>С ответами — для преподавателя</button>
+  </div>
+  <p class="src-note" id="dlNote"></p>
+</section>
+
+<section class="card" id="class">
+  <div class="sec-head"><div class="badge">4</div><div><h2>Варианты для класса</h2><p class="sub">Каждому ученику — свои числа: варианты идут подряд по seed (seed, seed+1, …) с теми же настройками. В архиве — папки «ученикам» и «ответы» и список вариантов.</p></div></div>
+  <div class="row"><label for="count" class="src-note">Вариантов:</label><input class="in num" id="count" type="number" min="2" max="60" value="25" style="width:80px">
+    <label class="chk" style="margin:0 8px"><input type="checkbox" id="zipTeacher" checked> с версиями «с ответами»</label>
+    <button class="btn primary" id="dlZip" disabled>Скачать архив (.zip)</button></div>
+  <p class="src-note">Работает для случайных данных. Сюжет «наугад» даёт разные сюжеты в разных вариантах, конкретный — одни и те же признаки с разными числами.</p>
+</section>
+
+<section class="card" id="inside">
+  <div class="sec-head"><div class="badge">5</div><div><h2>Как устроена тетрадь</h2><p class="sub">Та же структура, что у рабочих тетрадей № 2–7 курса.</p></div></div>
+  <div class="sheets">
+    <div><b>Задание</b>Данные, ν, число шагов, как проверяются ответы, порядок действий A–D, «где здесь градиентный спуск», шпаргалка и подсказка на старт.</div>
+    <div><b>Расчёт</b>Шаг 0 (среднее) и N сворачиваемых блоков. Жёлтые ячейки — ученика, справа — отметка. Сверху — общий прогресс, у каждого шага — «Проверено: 41 из 41».</div>
+    <div><b>Сводка</b>Выбранные колонки, Σ|rᵢ| и предсказания по шагам, «верно в шаге», сверка с эталоном и два графика — по числам ученика.</div>
+    <div><b>Ответы</b>Скрытый ключ: каждое значение тетради по порядку. Можно не включать (только с проверкой по цепочке).</div>
+  </div>
+  <h3>Один шаг — четыре этапа</h3>
+  <div class="steps4">
+    <div class="gd"><b>A. Градиент → остатки</b>∂L/∂Fᵢ = F − y, затем rᵢ = y − F и Σ|rᵢ|.</div>
+    <div><b>B. Группировка</b>Для каждой группы каждой колонки: Σr, γ = Σr / |G|, остаток ошибки Σ(r − γ)².</div>
+    <div><b>C. Выбор</b>Колонка с меньшей суммой остатков ошибки (при равенстве — верхняя).</div>
+    <div class="gd"><b>D. Шаг спуска</b>h = γ группы, шаг ν·h, F_m = F_{m−1} + ν·h, новый остаток и Σ|rᵢ|.</div>
+  </div>
+  <h3>Отметки</h3>
+  <div class="marks">
+    <div class="m-ok"><b>✓</b>верно с точностью до сотой</div>
+    <div class="m-bad"><b>✗</b>неверно</div>
+    <div class="m-warn"><b>ƒ</b>в ячейке формула — не засчитывается</div>
+    <div class="m-warn"><b>?</b>не число или колонки нет в списке</div>
+    <div class="m-dim"><b>…</b>выбор проверится, когда заполнен этап B</div>
+  </div>
+  <h3>Две проверки</h3>
+  <div class="tbl"><table class="cmp"><thead><tr><th></th><th>По цепочке (по умолчанию)</th><th>Строгая — по ключу</th></tr></thead><tbody>
+    <tr><td><b>С чем сверяется</b></td><td>С тем, что должно получиться из чисел самого ученика</td><td>Со скрытым ключом</td></tr>
+    <tr><td><b>Ошибка в шаге m</b></td><td>✗ ровно там, где ошибка; дальнейшие верные действия — ✓</td><td>✗ тянется в шаги m+1, m+2… — «как на бумаге»</td></tr>
+    <tr><td><b>Почти равные суммы в этапе C</b></td><td>Засчитывается любая колонка с минимальной суммой по числам ученика</td><td>Только колонка ключа; генератор предупреждает о таких шагах</td></tr>
+    <tr><td><b>Ключ в файле</b></td><td>Не обязателен: без него подсмотреть нечего</td><td>Нужен</td></tr>
+  </tbody></table></div>
+  <h3>Протокол округления</h3>
+  <p>Каждое вписанное число ученик округляет до сотых (половина — от нуля, как <code>ОКРУГЛ(x; 2)</code>) и дальше считает уже с ним. Ключ посчитан по тому же протоколу, поэтому совпадает с аккуратным учеником на всех шагах. Если хранить в ключе точные значения (0,0234375 вместо 0,02), то к 20-му шагу расхождения накапливаются: на данных тетради № 7 ученик, честно округляющий до сотых, получил бы больше 80 ложных ✗, а на поздних шагах ключ ждал бы даже другую колонку.</p>
+  <h3>Случайные данные</h3>
+  <p>Объекты — полный перебор значений признаков (4 при двух признаках, 8 при трёх), <code>y = база + Σ ±вклад признака + шум</code>. Вклады различаются в 2–6 раз — одна колонка «весит» больше и забирает первые шаги. Шум — комбинация взаимодействий признаков: он не сдвигает среднее (F₀ целое) и не виден ни одной колонке, поэтому Σ|rᵢ| сходится ровно к Σ|шум| — это «пол» из подсказки тетради.</p>
+</section>
+
+<section class="card" id="cli">
+  <div class="sec-head"><div class="badge">6</div><div><h2>Командная строка</h2><p class="sub">Тот же генератор без браузера: <code>extra/04_trainer/generate.py</code>, нужен только <code>openpyxl</code>.</p></div></div>
+<pre><code>python extra/04_trainer/generate.py --list                                   # уровни и сюжеты
+python extra/04_trainer/generate.py --level 3 --theme bakery --seed 7         # случайные данные
+python extra/04_trainer/generate.py --level 4 --steps 15 --lr 0.3 --check strict
+python extra/04_trainer/generate.py --data extra/04_trainer/presets/wb7_bakery.json --teacher-copy
+python extra/04_trainer/generate.py --data мои_данные.csv --lr 0.5 --steps 10   # CSV: объект; признаки…; y
+python extra/04_trainer/generate.py --level 3 --count 30 --out-dir 7Б --teacher-copy   # класс
+python extra/04_trainer/generate.py --seed 7 --print-spec &gt; вариант.json    # данные в JSON для правки</code></pre>
+  <p>Формат JSON — как у кнопки «Сохранить как JSON» выше и пресетов <code>presets/wb2…wb7</code> (данные рабочих тетрадей № 2–7):</p>
+<pre><code>{"theme": "bakery",
+ "features": ["Расположение", "Выходной"],
+ "rows": [["A", "спальный", "нет", 50], ["B", "спальный", "да", 62],
+          ["C", "торговый", "нет", 94], ["D", "торговый", "да", 114]],
+ "lr": 0.5, "steps": 20, "mode": "gradient", "check": "chain", "level": 3, "number": 7}</code></pre>
+  <p>Из Python: <code>from gbtrainer import make_spec, generate</code> → <code>generate(make_spec(level=3, seed=7))</code> возвращает байты .xlsx.</p>
+</section>
+
+<footer>Дополнительный урок курса «Градиентный бустинг по косточкам». Что считает тетрадь — <a href="../02_learning_rate/index.html">урок 02 «Learning rate и 20 шагов»</a>, откуда градиент — <a href="../03_gradient_descent/index.html">урок 03 «Где спрятан градиентный спуск»</a>. Тетрадь собирается прямо в браузере (Python в Pyodide) — данные никуда не отправляются.</footer>
+</main>
+</div>
+</body>
+</html>

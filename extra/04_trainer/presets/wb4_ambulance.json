@@ -1,0 +1,53 @@
+{
+  "$comment": "Данные рабочей тетради № 4 — пересобрать: python extra/04_trainer/generate.py --data presets/wb4_ambulance.json",
+  "theme": "ambulance",
+  "number": 4,
+  "catalog": 22,
+  "level": 3,
+  "lr": 0.5,
+  "mode": "residual",
+  "features": [
+    "Район",
+    "Ночь"
+  ],
+  "rows": [
+    [
+      "A",
+      "центр",
+      "нет",
+      23
+    ],
+    [
+      "B",
+      "центр",
+      "да",
+      33
+    ],
+    [
+      "C",
+      "окраина",
+      "нет",
+      53
+    ],
+    [
+      "D",
+      "окраина",
+      "да",
+      67
+    ]
+  ],
+  "structure": {
+    "base": 44,
+    "effects": [
+      16,
+      6
+    ],
+    "noise": [
+      1,
+      -1,
+      -1,
+      1
+    ]
+  },
+  "steps": 20
+}

@@ -1,0 +1,53 @@
+{
+  "$comment": "Данные рабочей тетради № 5 — пересобрать: python extra/04_trainer/generate.py --data presets/wb5_phone.json",
+  "theme": "phone",
+  "number": 5,
+  "catalog": 23,
+  "level": 3,
+  "lr": 0.5,
+  "mode": "gradient",
+  "features": [
+    "Тариф",
+    "Возраст"
+  ],
+  "rows": [
+    [
+      "A",
+      "базовый",
+      "< 30",
+      124
+    ],
+    [
+      "B",
+      "базовый",
+      "≥ 30",
+      156
+    ],
+    [
+      "C",
+      "безлимит",
+      "< 30",
+      236
+    ],
+    [
+      "D",
+      "безлимит",
+      "≥ 30",
+      284
+    ]
+  ],
+  "structure": {
+    "base": 200,
+    "effects": [
+      60,
+      20
+    ],
+    "noise": [
+      4,
+      -4,
+      -4,
+      4
+    ]
+  },
+  "steps": 20
+}

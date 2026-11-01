@@ -1,0 +1,53 @@
+{
+  "$comment": "Данные рабочей тетради № 6 — пересобрать: python extra/04_trainer/generate.py --data presets/wb6_houses.json",
+  "theme": "houses",
+  "number": 6,
+  "catalog": 24,
+  "level": 3,
+  "lr": 0.5,
+  "mode": "gradient",
+  "features": [
+    "Площадь",
+    "Гараж"
+  ],
+  "rows": [
+    [
+      "A",
+      "малая",
+      "нет",
+      1420
+    ],
+    [
+      "B",
+      "малая",
+      "да",
+      1940
+    ],
+    [
+      "C",
+      "большая",
+      "нет",
+      2900
+    ],
+    [
+      "D",
+      "большая",
+      "да",
+      3340
+    ]
+  ],
+  "structure": {
+    "base": 2400,
+    "effects": [
+      720,
+      240
+    ],
+    "noise": [
+      -20,
+      20,
+      20,
+      -20
+    ]
+  },
+  "steps": 20
+}
