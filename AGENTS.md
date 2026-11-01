@@ -30,7 +30,8 @@
 6. **Не редактируйте сгенерированные файлы:** `lessons/*/jupyter_notebooks/*.ipynb`,
    `lessons/*/README.md`, `lessons/*/data/*`, `shared/web/js/generated/*`, блок
    `<!-- curriculum -->` в корневом `README.md`, а также `extra/*/*.xlsx` и `extra/*/notebook.*`
-   (их собирают `extra/*/build_excel.py` и `gen_notebook.py`; тест `tests/python/test_extra_excel.py`).
+   (их собирают `extra/*/build_excel.py` и `gen_notebook.py`; тест `tests/python/test_extra_excel.py`)
+   и `extra/04_trainer/gbtrainer_bundle.js` (собирает `extra/04_trainer/build_bundle.py` из `gbtrainer/*.py`).
    Правьте источники и запускайте `tools/build.py`.
 7. **Веб-часть без сборщика.** Обычные скрипты (не ES-модули), глобальный объект `GBC`,
    страницы работают и по `http://`, и с диска (`file://`). Внешние библиотеки — только с CDN
@@ -49,6 +50,7 @@
 ├── course.json                # части курса, порядок модулей, карта понятий (источник истины)
 ├── lessons/lesson_*/          # уроки (см. §3)
 ├── examples/                 # 30 сквозных примеров 1_tiny → 4_large (см. §5, examples/README.md)
+├── extra/                     # дополнительные уроки; extra/04_trainer — генератор Excel-тетрадей (пакет gbtrainer, CLI, страница)
 ├── claude-server/             # локальный HTTP-сервер поверх Claude Code CLI — бэкенд ИИ-ассистента (см. §4)
 ├── shared/
 │   ├── python/gbcourse/       # учебная библиотека (numpy-only ядро, работает в Pyodide)
@@ -349,6 +351,12 @@ python tools/new_lesson.py lesson_5_4 "Название"        # заготов
   знаках `data/*.csv` после `tools/build.py` на другой машине (не коммитьте его) и то, что тест паритета обучает
   Python-модели на данных из JS: при равных выигрышах разбиений такой бит меняет дерево.
 * `data-scripts` в `boot.js` — список **через запятую**: `data-scripts="results.js,lesson.js"`.
+* Генератор тетрадей `extra/04_trainer/gbtrainer` — самостоятельный пакет (только `openpyxl`, без numpy и gbcourse):
+  страница грузит его в Pyodide из `gbtrainer_bundle.js`. Формулы в тетради — только из общего набора Excel 2013+,
+  LibreOffice и Google Таблиц; новые функции Excel пишутся с префиксом `_xlfn.` (`_xlfn.ISFORMULA`). В `COUNTIF`
+  знак `?` — шаблон, поэтому отметку «?» считают как `"~?"`. Ключ считается по протоколу ручного счёта (`solver.py`:
+  каждое число округлено до сотых, половина — от нуля); после правок — `pytest tests/python/test_trainer.py`
+  (сквозной тест пересчитывает файлы в LibreOffice) и `python extra/04_trainer/build_bundle.py`.
 * `datasets.regression_1d` возвращает объекты, **упорядоченные по x**: не делите их срезом `X[:n]` —
   используйте `train_test_split` или перестановку (`friedman1` не упорядочен).
 * Тяжёлые опыты (бенчмарки библиотек, сетки параметров) не считаются в браузере: пример
