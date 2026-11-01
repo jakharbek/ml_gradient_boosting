@@ -156,6 +156,36 @@ svg.spark .floor-t{fill:var(--orange);font-weight:700}
 table.cmp{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 table.cmp th{background:var(--teal-soft);text-align:left;padding:8px 10px;font-size:12.5px}
 table.cmp td{padding:8px 10px;border-top:1px solid var(--line-2);vertical-align:top}
+/* --- сюжет от ИИ --- */
+.badge.ai{background:var(--purple)}
+:root[data-theme="dark"] .badge.ai{color:#0e1320}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+.chips button{font:inherit;font-size:13px;font-weight:600;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);cursor:pointer}
+.chips button:hover{border-color:var(--purple);color:var(--purple)}
+textarea.ai{min-height:74px;font-family:Manrope,system-ui,sans-serif;font-size:15px;resize:vertical}
+.ai-status{margin:12px 0 0;font-size:14px;color:var(--ink-2);display:flex;gap:10px;align-items:flex-start}
+.ai-status:empty{display:none}
+.ai-status .spin{width:14px;height:14px;flex:0 0 14px;margin-top:3px;border-radius:50%;border:2px solid var(--purple-soft);border-top-color:var(--purple);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-status.err{color:var(--red);font-weight:600}
+.ai-status.ok{color:var(--green);font-weight:600}
+.ai-help{margin-top:12px}
+.ai-help ol{margin:6px 0 0;padding-left:22px}
+.ai-help li{margin:4px 0}
+.ai-result{margin-top:16px;border:1px solid var(--purple);border-radius:12px;padding:16px 18px;background:var(--purple-soft)}
+.ai-result h3{margin:0 0 4px;font-size:18px}
+.ai-result .why{color:var(--ink-2);margin:4px 0 10px}
+.ai-result table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;background:var(--paper);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ai-result th{text-align:left;padding:7px 10px;background:var(--paper-2);font-size:12.5px}
+.ai-result td{padding:7px 10px;border-top:1px solid var(--line-2)}
+.ai-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px 16px;margin:10px 0;font-size:13.5px}
+.ai-meta b{color:var(--muted);font-weight:700;margin-right:4px}
+.ai-meta .wide{grid-column:1/-1}
+.ai-saved{margin-top:16px}
+.ai-saved .item{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin:6px 0;background:var(--paper-2);font-size:14px}
+.ai-saved .item.on{border-color:var(--purple);box-shadow:0 0 0 2px var(--purple-soft)}
+.ai-saved .item .t{flex:1;min-width:160px;font-weight:700}
+.ai-saved .item small{color:var(--muted);font-weight:500}
 footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
 [hidden]{display:none!important}
 /* ---- мост токенов для ИИ-ассистента ---- */
@@ -187,6 +217,7 @@ footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
 <aside class="toc"><h4>Содержание</h4><nav id="toc">
   <a href="#intro">Что это</a>
   <a href="#settings">Настройки</a>
+  <a href="#ai">Сюжет с ИИ</a>
   <a href="#data">Данные</a>
   <a href="#preview">Предпросмотр и скачивание</a>
   <a href="#class">Варианты для класса</a>
@@ -198,7 +229,7 @@ footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
 <header class="hero" id="intro">
   <span class="eyebrow">Дополнительный урок 04 · инструмент</span>
   <h1>Генератор рабочих тетрадей</h1>
-  <p class="lead">Excel-тренажёр «градиентный бустинг своими руками»: ученик сам считает каждый шаг — градиент, остатки, группы, выбор колонки, шаг спуска — а рядом с каждым числом появляется ✓ или ✗. Данные — случайные по уровню сложности или ваши; число шагов, learning rate и способ проверки — любые.</p>
+  <p class="lead">Excel-тренажёр «градиентный бустинг своими руками»: ученик сам считает каждый шаг — градиент, остатки, группы, выбор колонки, шаг спуска — а рядом с каждым числом появляется ✓ или ✗. Данные — случайные по уровню сложности, по сюжету, который придумает ИИ-ассистент, или ваши; число шагов, learning rate и способ проверки — любые.</p>
   <div class="boot" id="boot"><span class="dot"></span><span id="bootText">Загружаю Python в браузер…</span></div>
 </header>
 
@@ -228,6 +259,32 @@ footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
       <label class="chk"><input type="checkbox" id="protect"> Защитить листы: менять можно только жёлтые ячейки</label>
       <label class="chk"><input type="checkbox" id="formulas"> Засчитывать формулы в жёлтых ячейках</label></div>
   </div>
+</section>
+
+<section class="card" id="ai">
+  <div class="sec-head"><div class="badge ai">✦</div><div><h2>Сюжет с ИИ-ассистентом</h2><p class="sub">Опишите, на каком примере тренироваться, — Claude придумает объект, три признака и правдоподобный масштаб. Сами числа строит генератор: среднее целое, шум слабее любого признака, «пол» известен — тетрадь считается вручную так же, как со встроенными сюжетами.</p></div></div>
+  <label for="aiText" class="src-note">Описание (необязательно — без него сюжет будет любым)</label>
+  <textarea class="in ai" id="aiText" maxlength="600" rows="3" placeholder="Например: время доставки пиццы; урожай клубники на даче; посещаемость бассейна зимой и летом…"></textarea>
+  <div class="chips" id="aiChips">
+    <button type="button">Время доставки пиццы</button>
+    <button type="button">Урожай клубники на даче</button>
+    <button type="button">Посетители бассейна за день</button>
+    <button type="button">Продажи мороженого в парке</button>
+    <button type="button">Расход топлива в поездке</button>
+    <button type="button">Очередь в столовой</button>
+  </div>
+  <div class="row">
+    <button class="btn primary" id="aiGo" disabled>✦ Придумать сюжет</button>
+    <button class="btn" id="aiMore" hidden>Ещё вариант</button>
+    <button class="btn" id="aiStop" hidden>Остановить</button>
+    <span style="flex:1"></span>
+    <label class="btn" for="aiFile">Загрузить сюжет…</label><input type="file" id="aiFile" accept=".json" hidden>
+    <button class="btn" id="aiSettings">Настройки ИИ</button>
+  </div>
+  <div class="ai-status" id="aiStatus" role="status" aria-live="polite"></div>
+  <div class="callout amber ai-help" id="aiHelp" hidden></div>
+  <div class="ai-result" id="aiResult" hidden></div>
+  <div class="ai-saved" id="aiSaved"></div>
 </section>
 
 <section class="card" id="data">
@@ -308,6 +365,8 @@ footer{color:var(--muted);font-size:13px;margin-top:36px;text-align:center}
   </tbody></table></div>
   <h3>Протокол округления</h3>
   <p>Каждое вписанное число ученик округляет до сотых (половина — от нуля, как <code>ОКРУГЛ(x; 2)</code>) и дальше считает уже с ним. Ключ посчитан по тому же протоколу, поэтому совпадает с аккуратным учеником на всех шагах. Если хранить в ключе точные значения (0,0234375 вместо 0,02), то к 20-му шагу расхождения накапливаются: на данных тетради № 7 ученик, честно округляющий до сотых, получил бы больше 80 ложных ✗, а на поздних шагах ключ ждал бы даже другую колонку.</p>
+  <h3>Сюжет от ИИ-ассистента</h3>
+  <p>Модель отвечает строго по JSON-схеме (структурированный вывод <code>claude-server</code>): название, объект и его падежи, целевая величина с единицами, три признака с двумя значениями и масштаб — типичное значение, разброс, шум. Генератор проверяет ответ (длины, символы, падежи, различие названий, разумность масштаба) и, если что-то не так, один раз просит модель исправить с текстом ошибки. Из масштаба строятся сетки чисел для ручного счёта, а сюжет проверяется на всех уровнях. Ответ модели не исполняется и не вставляется в страницу как разметка; сюжеты хранятся только в этом браузере.</p>
   <h3>Случайные данные</h3>
   <p>Объекты — полный перебор значений признаков (4 при двух признаках, 8 при трёх), <code>y = база + Σ ±вклад признака + шум</code>. Вклады различаются в 2–6 раз — одна колонка «весит» больше и забирает первые шаги. Шум — комбинация взаимодействий признаков: он не сдвигает среднее (F₀ целое) и не виден ни одной колонке, поэтому Σ|rᵢ| сходится ровно к Σ|шум| — это «пол» из подсказки тетради.</p>
 </section>
@@ -320,7 +379,10 @@ python extra/04_trainer/generate.py --level 4 --steps 15 --lr 0.3 --check strict
 python extra/04_trainer/generate.py --data extra/04_trainer/presets/wb7_bakery.json --teacher-copy
 python extra/04_trainer/generate.py --data мои_данные.csv --lr 0.5 --steps 10   # CSV: объект; признаки…; y
 python extra/04_trainer/generate.py --level 3 --count 30 --out-dir 7Б --teacher-copy   # класс
-python extra/04_trainer/generate.py --seed 7 --print-spec &gt; вариант.json    # данные в JSON для правки</code></pre>
+python extra/04_trainer/generate.py --seed 7 --print-spec &gt; вариант.json    # данные в JSON для правки
+python extra/04_trainer/generate.py --ai "время доставки пиццы" --save-theme pizza.json   # сюжет от ИИ
+python extra/04_trainer/generate.py --theme-file pizza.json --level 5 --count 25 --out-dir 9А</code></pre>
+  <p>Сюжет от ИИ спрашивается у того же локального <code>claude-server</code>, что и ИИ-ассистент курса (<code>python tools/serve.py</code>); кнопка «Сохранить сюжет» на этой странице даёт файл для <code>--theme-file</code>.</p>
   <p>Формат JSON — как у кнопки «Сохранить как JSON» выше и пресетов <code>presets/wb2…wb7</code> (данные рабочих тетрадей № 2–7):</p>
 <pre><code>{"theme": "bakery",
  "features": ["Расположение", "Выходной"],

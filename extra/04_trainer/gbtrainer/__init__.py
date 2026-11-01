@@ -37,7 +37,7 @@ from .model import (
     to_decimal,
 )
 from .solver import Solution, solve
-from .themes import THEMES
+from .themes import THEMES, Theme
 from .xlsx import build_workbook, workbook_bytes
 
 __all__ = ["make_spec", "generate", "preview", "file_name", "solve", "build_workbook", "Spec", "Settings",
@@ -51,7 +51,7 @@ def make_spec(
     *,
     data: dict[str, Any] | None = None,
     level: int | None = None,
-    theme: str | None = None,
+    theme: str | Theme | dict[str, Any] | None = None,
     seed: int | None = None,
     features: int | None = None,
     noise: bool | None = None,
@@ -61,6 +61,7 @@ def make_spec(
 
     * ``data`` — свои данные (формат см. ``spec_from_dict``); иначе данные случайные по ``level``,
       ``theme`` и ``seed`` (seed не задан — берётся случайный и записывается в свойства файла).
+      ``theme`` — ключ встроенного сюжета, объект Theme или словарь сюжета ИИ-ассистента (``ai.theme_to_dict``).
     * ``settings`` — поля :class:`Settings`: lr, steps, mode, check, key, teacher, number, catalog,
       title, allow_formulas, protect. Явно переданное значение важнее уровня и данных.
     """
@@ -80,6 +81,10 @@ def make_spec(
             settings["steps"] = get_level(level).steps
         return Spec(spec.dataset, replace(s, **settings).validated())
 
+    if isinstance(theme, dict):  # сюжет ИИ-ассистента (сохранённый или «сырой» ответ модели)
+        from .ai import theme_from_dict
+
+        theme = theme_from_dict(theme)
     lv = get_level(level if level is not None else 3)
     if seed is None:
         seed = secrets.randbelow(1_000_000)

@@ -7,6 +7,8 @@
     python extra/04_trainer/generate.py --data presets/wb7_bakery.json   # свои данные (JSON или CSV)
     python extra/04_trainer/generate.py --level 3 --count 30 --out-dir class_7b --teacher-copy
     python extra/04_trainer/generate.py --seed 12 --print-spec > my.json # данные в JSON, чтобы поправить руками
+    python extra/04_trainer/generate.py --ai "время доставки пиццы" --save-theme pizza.json   # сюжет от ИИ
+    python extra/04_trainer/generate.py --theme-file pizza.json --level 5 --count 25 --out-dir 9А
 """
 
 from __future__ import annotations
@@ -49,6 +51,15 @@ def _parser() -> argparse.ArgumentParser:
     src.add_argument("--theme", choices=[*THEMES, "random"], help="сюжет случайных данных (по умолчанию — по seed)")
     src.add_argument("--seed", type=int, help="seed случайных данных (одинаковый seed — одинаковая тетрадь)")
     src.add_argument("--features", type=int, choices=(1, 2, 3), help="число признаков в случайных данных")
+    src.add_argument("--theme-file", metavar="FILE", help="свой сюжет случайных данных — JSON (см. --save-theme)")
+
+    ai = p.add_argument_group("сюжет от ИИ-ассистента (нужен запущенный claude-server)")
+    ai.add_argument("--ai", metavar="ОПИСАНИЕ", help='придумать сюжет по описанию, например --ai "доставка пиццы"')
+    ai.add_argument("--ai-url", default="http://127.0.0.1:8137", help="адрес claude-server (по умолчанию %(default)s)")
+    ai.add_argument("--ai-model", default="sonnet", choices=("opus", "sonnet", "haiku"), help="модель (%(default)s)")
+    ai.add_argument("--ai-effort", default="low", choices=("low", "medium", "high"), help="сколько модель думает (%(default)s)")
+    ai.add_argument("--ai-token", default=None, help="Bearer-токен сервера (по умолчанию — $CLAUDE_SERVER_TOKEN)")
+    ai.add_argument("--save-theme", metavar="FILE", help="сохранить сюжет от ИИ в JSON, чтобы потом использовать --theme-file")
     noise = src.add_mutually_exclusive_group()
     noise.add_argument("--noise", dest="noise", action="store_true", default=None, help="данные с шумом")
     noise.add_argument("--no-noise", dest="noise", action="store_false", help="данные без шума")
@@ -98,6 +109,46 @@ def main(argv: list[str] | None = None) -> int:
     if args.count > 1 and args.output:
         print("ошибка: с --count файлы называются сами — укажите --out-dir вместо -o", file=sys.stderr)
         return 2
+    if (args.ai or args.theme_file) and args.data:
+        print("ошибка: --ai и --theme-file задают сюжет случайных данных — со своими данными (--data) они не нужны",
+              file=sys.stderr)
+        return 2
+    if args.ai and args.theme_file:
+        print("ошибка: укажите что-то одно — --ai или --theme-file", file=sys.stderr)
+        return 2
+    theme = args.theme
+    if args.theme_file or args.ai:
+        from .ai import ask_server, theme_from_dict, theme_to_dict
+
+        try:
+            if args.theme_file:
+                theme_obj = theme_from_dict(json.loads(Path(args.theme_file).read_text(encoding="utf-8-sig")))
+            else:
+                import os
+
+                if not args.quiet:
+                    print(f"… спрашиваю сюжет у claude-server ({args.ai_model}): «{args.ai}»", flush=True)
+                theme_obj, notes, _ = ask_server(args.ai, url=args.ai_url, model=args.ai_model, effort=args.ai_effort,
+                                                 token=args.ai_token or os.environ.get("CLAUDE_SERVER_TOKEN", ""))
+                if not args.quiet:
+                    feats = "; ".join(f"{f.name}: {f.levels[0]} / {f.levels[1]}" for f in theme_obj.features)
+                    print(f"✔ сюжет: {theme_obj.title} — {feats}")
+                    if theme_obj.rationale:
+                        print(f"   {theme_obj.rationale}")
+                    for n in notes:
+                        print(f"   · {n}")
+        except (OSError, json.JSONDecodeError) as e:
+            print(f"ошибка: не удалось прочитать сюжет: {e}", file=sys.stderr)
+            return 2
+        except SpecError as e:
+            print(f"ошибка: {e}", file=sys.stderr)
+            return 2
+        if args.save_theme:
+            Path(args.save_theme).write_text(json.dumps(theme_to_dict(theme_obj), ensure_ascii=False, indent=2),
+                                             encoding="utf-8")
+            if not args.quiet:
+                print(f"✔ сюжет сохранён: {args.save_theme} (потом: --theme-file {args.save_theme})")
+        theme = theme_obj
     if args.count > 1 and args.data:
         print("ошибка: --count — для случайных данных; со своими данными вариант один", file=sys.stderr)
         return 2
@@ -132,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
     seed0 = args.seed if args.seed is not None else secrets.randbelow(1_000_000)
     for v in range(args.count):
         try:
-            spec = make_spec(data=data, level=args.level, theme=args.theme, seed=None if data else seed0 + v,
+            spec = make_spec(data=data, level=args.level, theme=theme, seed=None if data else seed0 + v,
                              features=args.features, noise=args.noise, **settings)
         except SpecError as e:
             print(f"ошибка: {e}", file=sys.stderr)

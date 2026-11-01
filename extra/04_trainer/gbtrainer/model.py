@@ -14,7 +14,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from .themes import Theme, get_theme
+from .themes import THEMES, Theme, get_theme
 
 MAX_OBJECTS = 16
 MAX_FEATURES = 4
@@ -124,7 +124,7 @@ class Dataset:
             "features": list(self.features),
             "rows": [[self.names[i], *self.x[i], _num(self.y[i])] for i in range(self.n)],
         }
-        if self.theme:
+        if self.theme and self.theme in THEMES:  # сюжет ИИ-ассистента описан подписями выше
             d["theme"] = self.theme
         if self.structure:
             d["structure"] = {"base": self.structure.base, "effects": list(self.structure.effects),

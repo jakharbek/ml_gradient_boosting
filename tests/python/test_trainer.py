@@ -2,6 +2,8 @@
 
 * Протокол ручного счёта, генерация данных по уровням, проверка входных данных, CSV/JSON, CLI.
 * Пресет тетради № 7 воспроизводит её данные, ключ шага 1 и «пол» Σ|шум| = 8.
+* Сюжет от ИИ-ассистента: разбор и проверка ответа модели, масштабы, ремонтный запрос, CLI --ai
+  (с подставным claude-server — к Claude тест не обращается).
 * Сквозной тест (если установлен LibreOffice): файл пересчитывается настоящим табличным
   процессором; эталонные ответы дают ✓ во всех ячейках, испорченные — ✗/ƒ/? там, где нужно.
 """
@@ -284,3 +286,163 @@ def test_web_bridge() -> None:
     assert sorted(n.split("/")[0] for n in z.namelist()) == ["варианты.csv", "ответы", "ответы", "ученикам", "ученикам"]
     spec = json.loads(web.spec_json(req))["spec"]
     assert g.make_spec(data=spec).dataset.y == g.make_spec(level=2, theme="rent", seed=4).dataset.y
+
+
+# --- сюжет от ИИ-ассистента ----------------------------------------------------------------
+from gbtrainer import ai  # noqa: E402
+
+GOOD = dict(ai.EXAMPLE)
+
+
+def test_ai_example_is_valid_and_builds_all_levels() -> None:
+    th, notes = ai.theme_from_proposal(GOOD)
+    assert th.source == "ai" and th.object == "Кофейня" and th.each == "каждой кофейне"
+    assert th.base[2] > 0 and th.effect[0] >= 4 and th.noise[1] <= th.effect[0] * 0.3 + 1
+    for level in sorted(g.LEVELS):
+        ds = g.make_spec(level=level, seed=3, theme=th).dataset
+        assert ds.object == "Кофейня" and ds.k == g.LEVELS[level].features
+        assert all(v > 0 for v in ds.y) and sum(ds.y) / ds.n == ds.structure.base
+    assert ai.theme_from_dict(json.loads(json.dumps(ai.theme_to_dict(th)))) == th
+
+
+@pytest.mark.parametrize("typical", [40, 60, 120, 450, 2400, 5000, 20000])
+@pytest.mark.parametrize("frac", [0.3, 0.8, 1.2, 3.0])
+@pytest.mark.parametrize("noise", [0, 1, 0.08])
+def test_ai_scale_always_feasible(typical: float, frac: float, noise: float) -> None:
+    """Любой разумный масштаб даёт сюжет, годный для всех уровней; признак заметнее шума."""
+    th, _ = ai.theme_from_proposal(dict(GOOD, typical=typical, spread=typical * frac, noise=noise * typical if noise < 1 else noise))
+    assert th.effect[0] >= 3 * th.noise[1]
+
+
+@pytest.mark.parametrize(
+    "patch, msg",
+    [
+        ({"each": "кофейне"}, "каждому"),
+        ({"features": GOOD["features"][:2]}, "ровно три признака"),
+        ({"features": [{"name": "Район, город", "levels": ["a", "b"]}, *GOOD["features"][1:]]}, "без запятых"),
+        ({"features": [{"name": "Район", "levels": ["да", "Да"]}, *GOOD["features"][1:]]}, "одинаковых"),
+        ({"features": [GOOD["features"][0], GOOD["features"][0], GOOD["features"][2]]}, "различаться"),
+        ({"title": "<script>alert(1)</script>"}, "служебные"),
+        ({"object": "x" * 40}, "длиннее"),
+        ({"typical": 5}, "от 40 до 5000"),
+        ({"typical": "много"}, "число"),
+        ({"spread": -3}, "больше нуля"),
+    ],
+)
+def test_ai_rejects_bad_proposals(patch: dict, msg: str) -> None:
+    with pytest.raises(SpecError, match=msg):
+        ai.theme_from_proposal(dict(GOOD, **patch))
+
+
+def test_ai_fixes_small_things_with_notes() -> None:
+    th, notes = ai.theme_from_proposal(dict(GOOD, target="Выручка, тыс. ₽", spread=500, noise=40,
+                                            rationale="Потому что <b>так</b>."))
+    assert th.target == "Выручка yᵢ, тыс. ₽" and th.rationale == "Потому что так."
+    assert any("yᵢ" in n for n in notes) and any("разброс" in n for n in notes) and any("шум" in n for n in notes)
+
+
+@pytest.mark.parametrize("text", [
+    json.dumps(GOOD, ensure_ascii=False),
+    "Вот сюжет:\n```json\n" + json.dumps(GOOD, ensure_ascii=False) + "\n```\nУдачи!",
+    "Ответ: " + json.dumps(GOOD, ensure_ascii=False) + " — готово.",
+])
+def test_ai_parse_reply(text: str) -> None:
+    assert ai.parse_reply(text)["object"] == "Кофейня"
+
+
+def test_ai_messages_and_schema() -> None:
+    msgs = ai.build_messages("Пицца\x00 " + "x" * 2000, ["Кофейни — выручка"])
+    assert [m["role"] for m in msgs] == ["system", "user"]
+    assert "\x00" not in msgs[1]["content"] and len(msgs[1]["content"]) < 1000 and "Кофейни" in msgs[1]["content"]
+    assert len(json.dumps(msgs, ensure_ascii=False)) < 22000  # лимит запроса claude-server (Windows)
+    assert set(ai.AI_SCHEMA["required"]) <= set(ai.AI_SCHEMA["properties"]) and set(GOOD) == set(ai.AI_SCHEMA["properties"])
+    rep = ai.repair_messages(msgs, "{плохо}", "поле each …")
+    assert [m["role"] for m in rep] == ["system", "user", "assistant", "user"] and "поле each" in rep[-1]["content"]
+
+
+def test_ai_web_bridge() -> None:
+    from gbtrainer import web
+
+    req = json.loads(web.ai_request(json.dumps({"description": "пицца", "avoid": ["A"]})))
+    assert req["ok"] and req["schema"] == ai.AI_SCHEMA and len(req["messages"]) == 2
+    acc = json.loads(web.ai_accept("```json\n" + json.dumps(GOOD, ensure_ascii=False) + "\n```"))
+    assert acc["ok"] and acc["theme"]["object"] == "Кофейня"
+    bad = json.loads(web.ai_accept(json.dumps(dict(GOOD, each="кофейне"), ensure_ascii=False)))
+    assert not bad["ok"] and "каждому" in bad["error"]
+    assert json.loads(web.theme_check(json.dumps(acc["theme"])))["ok"]
+    assert not json.loads(web.theme_check(json.dumps(dict(acc["theme"], base=[0, -5, 1]))))["ok"]
+    pv = json.loads(web.preview_json(json.dumps({"source": "random", "level": 5, "seed": 2, "theme_def": acc["theme"]})))
+    assert pv["ok"] and pv["dataset"]["object"] == "Кофейня" and len(pv["dataset"]["rows"]) == 8
+    assert "theme" not in pv["dataset"]  # сюжет ИИ описан подписями, а не ключом встроенного сюжета
+
+
+class _FakeClaudeServer:
+    """Подставной claude-server: /v1/chat/completions отвечает по очереди заготовленными ответами."""
+
+    def __init__(self, replies: list[str]) -> None:
+        import http.server
+        import threading
+
+        self.replies, self.bodies = list(replies), []
+        outer = self
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_POST(self) -> None:  # noqa: N802
+                outer.bodies.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+                body = json.dumps({"choices": [{"message": {"role": "assistant", "content": outer.replies.pop(0)}}]}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a) -> None:
+                pass
+
+        self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def close(self) -> None:
+        self.httpd.shutdown()
+
+
+def test_ai_ask_server_repairs_once() -> None:
+    srv = _FakeClaudeServer([json.dumps(dict(GOOD, each="кофейне"), ensure_ascii=False), json.dumps(GOOD, ensure_ascii=False)])
+    try:
+        th, notes, proposal = ai.ask_server("кофейни", url=srv.url + "/v1", model="haiku")
+    finally:
+        srv.close()
+    assert th.object == "Кофейня" and proposal["each"] == "каждой кофейне"
+    first, second = srv.bodies
+    assert first["json_schema"] == ai.AI_SCHEMA and first["stream"] is False and first["model"] == "haiku"
+    assert not {"allow_tools", "permission_mode", "cwd"} & set(first)  # инструменты Claude Code не просим
+    assert [m["role"] for m in second["messages"]][-2:] == ["assistant", "user"]
+
+
+def test_ai_ask_server_gives_up_and_offline() -> None:
+    srv = _FakeClaudeServer(["не JSON", "опять не JSON"])
+    try:
+        with pytest.raises(SpecError, match="не смогла"):
+            ai.ask_server("x", url=srv.url)
+    finally:
+        srv.close()
+    with pytest.raises(SpecError, match="недоступен"):
+        ai.ask_server("x", url="http://127.0.0.1:9", timeout=2)
+
+
+def test_cli_ai_theme_roundtrip(tmp_path: Path) -> None:
+    from gbtrainer.cli import main
+
+    srv = _FakeClaudeServer([json.dumps(GOOD, ensure_ascii=False)])
+    theme_file = tmp_path / "кофейни.json"
+    try:
+        assert main(["--ai", "кофейни", "--ai-url", srv.url, "--save-theme", str(theme_file), "--seed", "4",
+                     "--out-dir", str(tmp_path), "-q"]) == 0
+    finally:
+        srv.close()
+    assert json.loads(theme_file.read_text(encoding="utf-8"))["object"] == "Кофейня"
+    assert main(["--theme-file", str(theme_file), "--level", "5", "--count", "2", "--out-dir", str(tmp_path / "k"), "-q"]) == 0
+    wb = openpyxl.load_workbook(next((tmp_path / "k").glob("*.xlsx")))
+    assert wb["Задание"]["B8"].value == "A" and wb["Задание"]["B7"].value == "Кофейня"
+    assert main(["--ai", "x", "--data", str(theme_file)]) == 2
